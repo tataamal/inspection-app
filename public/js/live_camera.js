@@ -7,9 +7,9 @@ function openCamera(videoId, canvasId, previewId, inputId, captureBtnId) {
     navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
             video.srcObject = stream;
-            video.classList.remove('d-none');
-            captureBtn.classList.remove('d-none');
-            if (cancelBtn) cancelBtn.classList.remove('d-none');
+            video.classList.remove('hidden');
+            captureBtn.classList.remove('hidden');
+            if (cancelBtn) cancelBtn.classList.remove('hidden');
         })
         .catch(err => {
             Swal.fire({
@@ -36,15 +36,15 @@ function captureImage(videoId, canvasId, previewId, inputId, captureBtnId, cance
 
     const imageData = canvas.toDataURL('image/png');
     preview.src = imageData;
-    preview.classList.remove('d-none');
+    preview.classList.remove('hidden');
     input.value = imageData;
 
     stopCamera(video);
 
-    video.classList.add('d-none');
-    captureBtn.classList.add('d-none');
-    if (cancelBtn) cancelBtn.classList.add('d-none');
-    if (retakeBtn) retakeBtn.classList.remove('d-none');
+    video.classList.add('hidden');
+    captureBtn.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (retakeBtn) retakeBtn.classList.remove('hidden');
 }
 
 function retakeCapture(videoId, canvasId, previewId, inputId, captureBtnId, retakeBtnId) {
@@ -53,13 +53,13 @@ function retakeCapture(videoId, canvasId, previewId, inputId, captureBtnId, reta
     const retakeBtn = document.getElementById(retakeBtnId);
 
     // Kosongkan preview & input
-    preview.classList.add('d-none');
+    preview.classList.add('hidden');
     preview.src = '';
     input.value = '';
 
     // Buka ulang kamera
     openCamera(videoId, canvasId, previewId, inputId, captureBtnId);
-    if (retakeBtn) retakeBtn.classList.add('d-none');
+    if (retakeBtn) retakeBtn.classList.add('hidden');
 }
 
 function cancelCamera(videoId, captureBtnId, cancelBtnId) {
@@ -69,9 +69,9 @@ function cancelCamera(videoId, captureBtnId, cancelBtnId) {
 
     stopCamera(video);
 
-    if (video) video.classList.add('d-none');
-    if (captureBtn) captureBtn.classList.add('d-none');
-    if (cancelBtn) cancelBtn.classList.add('d-none');
+    if (video) video.classList.add('hidden');
+    if (captureBtn) captureBtn.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
 }
 
 // Utility: Stop stream kamera

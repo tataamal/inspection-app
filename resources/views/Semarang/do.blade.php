@@ -13,7 +13,7 @@
         <span class="text-lg font-medium">Halo, Username</span>
         </div>
         <button class="bg-red-500 hover:bg-red-600 p-2 rounded text-white transition">
-        <i class="fa-solid fa-right-from-bracket"></i>
+        <i class="fa-solid fa-power-off"></i>
         </button>
     </div>
 
@@ -43,6 +43,17 @@
                   @endif">
                     <i class="fa-solid fa-clipboard-check"></i>
                     Task DO
+                </button>
+
+                <button id="btn-activity"
+                  class="px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2
+                  @if (Request::is('semarang-activity'))
+                    bg-green-300 text-black hover:scale-105 active:scale-95
+                  @else
+                    bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300
+                  @endif">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    Activity
                 </button>
             </div>
         </div>

@@ -20,7 +20,7 @@ function generateTableData() {
                     <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">${status}</span>
                 </td>
                 <td class="p-3 w-32">
-                    <button class="bg-lime-400 hover:bg-lime-500 text-black px-3 py-1 rounded-full font-semibold transition text-xs">Accept</button>
+                    <button class="bg-green-400 hover:bg-green-500 focus:border-2 active:border-green-900 text-black px-3 py-1 rounded-full font-semibold transition text-xs">Accept</button>
                 </td>
             </tr>
         `;
