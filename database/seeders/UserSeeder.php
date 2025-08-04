@@ -13,20 +13,20 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         User::create([
-            'name' => 'autoemail',
-            'password' => Hash::make('password'),
+            'username' => 'auto_email',
+            'password' => Hash::make('11223344'),
             'role' => 'admin'
         ]);
 
         User::create([
-            'name' => 'inspector',
-            'password' => Hash::make('password'),
+            'username' => 'auto_email',
+            'password' => Hash::make('11223344'),
             'role' => 'inspector'
         ]);
 
         User::create([
-            'name' => 'buyer',
-            'password' => Hash::make('password'),
+            'username' => 'auto_email',
+            'password' => Hash::make('11223344'),
             'role' => 'buyer'
         ]);
     }

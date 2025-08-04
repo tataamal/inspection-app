@@ -116,8 +116,10 @@
             </div>
         </div>
       </nav>
+      <form action="{{ route('logout') }}" method="POST">
+      @csrf
       <button class="mt-auto top-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white px-4 py-2 rounded-md flex items-center gap-2">
         <i class="fa-solid fa-power-off"></i>
         Keluar
-      </button>
+      </button></form>
     </aside>

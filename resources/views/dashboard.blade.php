@@ -10,7 +10,7 @@
         <div class="flex justify-between items-center bg-white p-4 rounded shadow">
           <div class="flex items-center gap-2">
             <i class="fa-solid fa-user"></i>
-            <span class="text-lg font-medium">Halo, Username</span>
+            <span class="text-lg font-medium">Halo, {{ session('user_role') }}
           </div>
           <button class="bg-red-500 hover:bg-red-600 p-2 rounded text-white transition">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg>
