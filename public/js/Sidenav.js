@@ -27,6 +27,7 @@ function toggleDropdown(location) {
 document.addEventListener('click', function(event) {
     const semarangBtn = event.target.closest('[onclick="toggleDropdown(\'semarang\')"]');
     const surabayaBtn = event.target.closest('[onclick="toggleDropdown(\'surabaya\')"]');
+    const addQuestion = event.target.closest('[onclick="toggleDropdown(\'addQuestion\')"]');
     const semarangDropdown = document.getElementById('semarang-dropdown');
     const surabayaDropdown = document.getElementById('surabaya-dropdown');
     

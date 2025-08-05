@@ -51,7 +51,9 @@ class LoginController extends Controller
                     ]);
 
                     return match ($role) {
-                        'admin' => view('dashboard'),
+                        'admin' => view('dashboard',[
+                            compact('$totalInspection')
+                        ]),
                         'inspector' => view('dashboard'),
                         'buyer' => view('dashboard'),
                     };

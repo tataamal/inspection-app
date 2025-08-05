@@ -6,7 +6,12 @@ use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
-    public function create()
+    public function create_jenis_inspeksi()
+    {
+        return view('admin.create_type');
+    }
+
+    public function create_question()
     {
         return view('admin.create');
     }

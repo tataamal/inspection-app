@@ -83,15 +83,9 @@ use Illuminate\Support\Str;
             </h6>
 
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <!-- Ilustrasi: 2 Kolom -->
-                <div class="md:col-span-2 flex items-start justify-center">
-                    <div class="text-center">
-                        <img src="{{ asset('images/ss.png') }}" alt="Ilustrasi Pemeriksaan" class="w-full max-w-48 rounded-lg shadow-sm">
-                    </div>
-                </div>
 
                 <!-- Checklist Scrollable Grid: 6 Kolom -->
-                <div class="md:col-span-6">
+                <div class="md:col-span-8">
                     <div class="flex overflow-x-auto border border-gray-200 shadow-sm rounded-lg gap-3 p-3 bg-gray-50">
                         @php
                         $inspectionItems = [

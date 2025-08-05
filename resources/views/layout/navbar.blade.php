@@ -115,6 +115,13 @@
                 </a>
             </div>
         </div>
+
+        @if(Auth::check() && Auth::user()->role === 'admin')
+            @include('layout.partials.sidebar-admin')
+        @elseif(Auth::check() && Auth::user()->role === 'user')
+            @include('layouts.partials.sidebar-user')
+        @endif
+        
       </nav>
       <form action="{{ route('logout') }}" method="POST">
       @csrf

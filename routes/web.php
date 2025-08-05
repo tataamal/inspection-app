@@ -28,12 +28,12 @@ Route::middleware(['auth'])->group(function () {
 
     // routing halaman yang bisa diakses semua role user
     Route::get('/dashboard', [InspectionController::class, 'Dashboard'])->name('dashboard');
-    
-    Route::get('/semarang-inspect',[InspectionController::class, 'InspectionSemarang'])->name('inspect-semarang');
+
 
     // routing halaman yang hanya bisa diakses oleh admin
-    Route::get('/admin-create', [AdminController::class, 'create'])->name('create-question')->middleware('role:admin');
-    Route::get('/admin-edit', [AdminController::class, 'edit'])->name('create-edit')->middleware('role:admin');
+    Route::get('/create-jenis-inspeksi', [AdminController::class, 'create_jenis_inspeksi'])->name('create-jenis-inspeksi');
+    Route::get('/create-pertanyaan', [AdminController::class, 'create_question'])->name('create-pertanyaan');
+    Route::get('/admin-edit', [AdminController::class, 'edit'])->name('create-edit');
 
     // routing halaman ke semarang
     Route::get('/semarang-pro',[SemarangController::class, 'InspectionLotSemarang'])->name('PRO-semarang');
