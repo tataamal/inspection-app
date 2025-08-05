@@ -7,9 +7,9 @@
         </div>
       <h1 class="text-center text-lg font-semibold">Product Quality Inspection<br>PT. Kayu Mabel Indonesia</h1>
       <nav class="w-full mt-6 space-y-5">
-        <a href="#"
+        <a href="{{ route('dashboard') }}"
           class="flex items-center gap-2 px-4 py-2 rounded-md transition duration-200
-                  @if (Request::is('semarang-pro'))
+                  @if (Request::is('dashboard'))
                     bg-white text-black hover:scale-105 active:scale-95
                   @else
                     bg-gray-800 text-white hover:bg-gray-700
@@ -20,7 +20,7 @@
         <div class="w-full">
           <button onclick="toggleDropdown('semarang')" 
               class="flex items-center justify-between w-full px-4 py-2 rounded-md transition duration-200
-                      @if (Request::is('inspeksi-semarang*'))
+                      @if (Request::is('semarang-pro*'))
                         bg-white text-black hover:scale-105 active:scale-95
                       @else
                         bg-gray-800 text-white hover:bg-gray-700
@@ -30,11 +30,11 @@
                   WC Semarang
               </div>
               <i id="semarang-arrow" class="fa-solid fa-chevron-down transition-transform duration-200
-                  @if (Request::is('inspeksi-semarang*')) text-black @else text-white @endif"></i>
+                  @if (Request::is('semarang-pro*')) text-black @else text-white @endif"></i>
           </button>
           
-          <div id="semarang-dropdown" class="@if (!Request::is('semarang*')) hidden @endif mt-2 ml-4 space-y-2">
-                <a href="#" 
+          <div id="semarang-dropdown" class="@if (!Request::is('semarang-pro*')) hidden @endif mt-2 ml-4 space-y-2">
+                <a href="{{ route('PRO-semarang') }}" 
                     class="flex items-center gap-2 px-4 py-2 rounded-md transition duration-200 text-sm
                           @if (Request::is('semarang-pro'))
                             bg-white text-black hover:scale-105 active:scale-95
@@ -44,7 +44,7 @@
                     <i class="fa-solid fa-list"></i>
                     List PRO
                 </a>
-                <a href="#" 
+                <a href="{{ route('DO-semarang') }}" 
                     class="flex items-center gap-2 px-4 py-2 rounded-md transition duration-200 text-sm
                           @if (Request::is('semarang-do'))
                             bg-white text-black hover:scale-105 active:scale-95
@@ -69,7 +69,7 @@
         <div class="w-full">
             <button onclick="toggleDropdown('surabaya')" 
                 class="flex items-center justify-between w-full px-4 py-2 rounded-md transition duration-200
-                        @if (Request::is('inspeksi-surabaya*'))
+                        @if (Request::is('surabaya-pro*'))
                           bg-white text-black hover:scale-105 active:scale-95
                         @else
                           bg-gray-800 text-white hover:bg-gray-700
@@ -79,13 +79,13 @@
                     WC Surabaya
                 </div>
                 <i id="surabaya-arrow" class="fa-solid fa-chevron-down transition-transform duration-200
-                    @if (Request::is('inspeksi-surabaya*')) text-black @else text-white @endif"></i>
+                    @if (Request::is('surabaya-pro*')) text-black @else text-white @endif"></i>
             </button>
             
-            <div id="surabaya-dropdown" class="@if (!Request::is('inspeksi-surabaya*')) hidden @endif mt-2 ml-4 space-y-2">
-                <a href="#" 
+            <div id="surabaya-dropdown" class="@if (!Request::is('surabaya-pro')) hidden @endif mt-2 ml-4 space-y-2">
+                <a href="{{ route('PRO-surabaya') }}" 
                     class="flex items-center gap-2 px-4 py-2 rounded-md transition duration-200 text-sm
-                          @if (Request::is('inspeksi-surabaya/pro'))
+                          @if (Request::is('surabaya-pro'))
                             bg-white text-black hover:scale-105 active:scale-95
                           @else
                             bg-gray-700 text-white hover:bg-gray-600
@@ -93,7 +93,7 @@
                     <i class="fa-solid fa-list"></i>
                     List PRO
                 </a>
-                <a href="#" 
+                <a href="{{ route('DO-surabaya') }}" 
                     class="flex items-center gap-2 px-4 py-2 rounded-md transition duration-200 text-sm
                           @if (Request::is('inspeksi-surabaya/do'))
                             bg-white text-black hover:scale-105 active:scale-95

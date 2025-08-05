@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\QualityInspectionLot;
 use Illuminate\Http\Request;
 use function PHPUnit\Framework\returnArgument;
 
@@ -9,13 +9,10 @@ class InspectionController extends Controller
 {
     public function Dashboard()
     {
-        return view('dashboard');
+        $totalInspection = QualityInspectionLot::count();
+        return view('dashboard', compact('totalInspection'));
     }
 
-    public function ProSemarang()
-    {
-        return view('semarang.pro');
-    }
 
     public function DOSemarang()
     {

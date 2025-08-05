@@ -20,8 +20,8 @@
         <!-- Statistik Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="bg-white rounded shadow p-4 text-center">
-            <p class="text-gray-600">Jumlah List Data Inspeksi</p>
-            <p class="text-4xl font-bold text-green-900">453</p>
+            <p class="text-gray-600">Total Semua Data Inspeksi</p>
+            <p class="text-4xl font-bold text-green-900">{{ $totalInspection }}</p>
           </div>
           <div class="bg-white rounded shadow p-4 text-center">
             <p class="text-gray-600">Jumlah Riwayat Inspeksi</p>
