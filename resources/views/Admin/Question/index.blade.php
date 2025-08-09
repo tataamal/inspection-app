@@ -246,7 +246,7 @@ tbody tr:hover {
                                     title="Lihat Detail">
                                     <i class="fa-solid fa-eye m-1"></i>
                                 </a>
-                                <a href="{{ route('inspection-types.edit', $type->id) }}"
+                                <a href="{{ route('inspection-types.create', $type->id) }}"
                                     class="btn-warning text-md bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
                                     title="Edit">
                                     <i class="fa-solid fa-pen-to-square m-1"></i>

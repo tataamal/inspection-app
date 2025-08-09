@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('inspection_question', function (Blueprint $table) {
+        Schema::create('inspection_questions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('header_id')->constrained('inspection_headers')->onDelete('cascade');
             $table->string('question_text');

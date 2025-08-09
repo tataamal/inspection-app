@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\InspectionController;
 use App\Http\Controllers\InspectionSetupController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\SemarangController;
@@ -28,17 +27,20 @@ Route::middleware(['guest'])->group(function() {
 Route::middleware(['auth'])->group(function () {
 
     // routing halaman yang bisa diakses semua role user
-    Route::get('/dashboard', [InspectionController::class, 'Dashboard'])->name('dashboard');
+    Route::get('/dashboard', [InspectionSetupController::class, 'Dashboard'])->name('dashboard');
 
 
     // routing halaman yang hanya bisa diakses oleh admin
+    Route::get('/inspection-view', [InspectionSetupController::class, 'view'])->name('inspection-view');
     Route::get('/inspection-types', [InspectionSetupController::class, 'index'])->name('inspection-types.index');
-Route::post('/inspection-types', [InspectionSetupController::class, 'store'])->name('inspection-types.store');
-Route::get('/inspection-types/{id}/edit', [InspectionSetupController::class, 'edit'])->name('inspection-types.edit');
-Route::get('/inspection-types/{id}', [InspectionSetupController::class, 'show'])->name('inspection-types.show');
-    // Route::get('/create-jenis-inspeksi', [AdminController::class, 'create_jenis_inspeksi'])->name('create-jenis-inspeksi');
-    // Route::get('/create-pertanyaan', [AdminController::class, 'create_question'])->name('create-pertanyaan');
-    // Route::get('/admin-edit', [AdminController::class, 'edit'])->name('create-edit');
+    Route::post('/inspection-types', [InspectionSetupController::class, 'store'])->name('inspection-types.store');
+    Route::get('/inspection-types/{id}/edit', [InspectionSetupController::class, 'edit'])->name('inspection-types.edit');
+    Route::get('/inspection-create{id}', [InspectionSetupController::class, 'create'])->name('inspection-types.create');
+    Route::post('/inspection-submit-detail', [InspectionSetupController::class, 'submitDetail'])->name('inspection-types.submit_detail');
+    Route::get('/inspection-show/{id}', [InspectionSetupController::class, 'show'])->name('inspection-types.show');
+    Route::get('/inspection-detail', [InspectionSetupController::class, 'show'])->name('inspection-types.show');
+    Route::delete('/inspection-types/{id}', [InspectionSetupController::class, 'destroy'])->name('inspection-types.destroy');
+    
 
     // routing halaman ke semarang
     Route::get('/semarang-pro',[SemarangController::class, 'InspectionLotSemarang'])->name('PRO-semarang');

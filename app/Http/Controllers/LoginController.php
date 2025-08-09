@@ -11,63 +11,76 @@ class LoginController extends Controller
 {
     public function Login(Request $request)
     {
-        // dd($request);
-        $credentials = $request->only('username', 'password');
+        $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
+            'role' => 'required|in:admin,inspector,buyer', // Pastikan role valid
+        ]);
 
+        // dd($request);
+
+        $credentials = $request->only('username', 'password', 'role');
         // dd($credentials);
 
+        // Cek autentikasi Laravel (MySQL)
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
 
-            // dd($request);
+            $user = Auth::user(); // Get the logged-in user
+            $role = $user->role;
 
-            $role = Auth::user()->role;
+            // dd($user, $role);
 
-            // dd($role);
-
-            // masuk ke SAP
-            if(in_array($role, ['admin', 'inspector'])) {
-                // minta SAP credential
+            // Jika role cocok untuk login ke SAP
+            if (in_array($role, ['admin', 'inspector'])) {
+                // Ambil SAP credential dari form (boleh pakai input khusus jika SAP credential beda dari Laravel)
                 $sapUsername = $request->input('username');
                 $sapPassword = $request->input('password');
-                $userRole = $request->input('role');
 
                 // dd($sapUsername, $sapPassword);
 
-                // autentikasi ke SAP menggunakan API Flask
-                $response = Http::post('http://localhost:5050/api/sap-login',[
+                // Kirim request ke API Flask
+                $response = Http::post('http://localhost:5050/api/sap-login', [
                     'username' => $sapUsername,
-                    'password'=> $sapPassword,
+                    'password' => $sapPassword,
                 ]);
 
-                // dd($response->body());
+                // dd($response->json(), $role);
 
-                if($response->json('status') === 'connected') {
-                    // simpan credential ke session
+                // Jika login ke SAP berhasil
+                if ($response->json('status') === 'connected') {
+                    // Simpan ke session
                     session([
                         'sap_user' => $sapUsername,
                         'sap_password' => $sapPassword,
-                        'user_role' => $userRole,
+                        'user_role' => $role,
                     ]);
 
-                    return match ($role) {
-                        'admin' => view('dashboard',[
-                            compact('$totalInspection')
-                        ]),
-                        'inspector' => view('dashboard'),
-                        'buyer' => view('dashboard'),
-                    };
+                    // dd(session()->all());
 
+                    // Redirect sesuai role
+                    return match ($role) {
+                        'admin'     => redirect()->route('dashboard'),
+                        'inspector' => redirect()->route('dashboard'),
+                        'buyer'     => redirect()->route('dashboardd'),
+                        default     => redirect()->route('dashboard'),
+                    };
                 } else {
-                    return back()->withErrors(['sap' => 'Login ke SAP gagal.'])->onlyInput('username');
+                    // Gagal login SAP
+                    Auth::logout(); // logout dari Laravel juga
+                    return back()->withErrors([
+                        'sap' => 'Username atau Password SAP tidak sesuai.',
+                    ])->onlyInput('username');
                 }
             } else {
-                dd('Tidak masuk ke SAP');
+                // Role tidak perlu login SAP, langsung redirect
+                return redirect()->route('home');
             }
         }
-        
+
+        // Gagal login Laravel
         return back()->withErrors([
-            'username' => 'Username atau Password salah. ',
+            'username' => 'Username atau Password salah.',
         ])->onlyInput('username');
     }
 

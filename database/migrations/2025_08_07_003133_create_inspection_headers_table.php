@@ -13,11 +13,15 @@ return new class extends Migration
     {
         Schema::create('inspection_headers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('inspection_type_id')
-                  ->constrained('inspection_type') // FK untuk jenis inspeksi
-                  ->onDelete('cascade');
-            $table->string('header_name'); // Judul Header 
+            $table->unsignedBigInteger('inspection_type_id'); // singular
+
+            $table->string('title');
             $table->timestamps();
+
+            $table->foreign('inspection_type_id')
+                ->references('id')
+                ->on('inspection_types') // plural
+                ->onDelete('cascade');
         });
     }
 

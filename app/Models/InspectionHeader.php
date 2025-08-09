@@ -17,4 +17,9 @@ class InspectionHeader extends Model
     {
         return $this->hasMany(InspectionQuestion::class, 'header_id');
     }
+
+     protected $fillable = [
+        'inspection_type_id',
+        'title',
+    ];
 }
