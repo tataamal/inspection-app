@@ -348,7 +348,7 @@ tbody tr:hover {
                                                     <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
                                                         #{{ $headerIndex + 1 }}
                                                     </span>
-                                                    <a href="{{ route('inspection-types.create', ['type' => $type->id, 'header' => $header->id]) }}" 
+                                                    <a href="#" 
                                                        class="btn-warning text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded focus:outline-none" 
                                                        title="Edit Header">
                                                         <i class="fa-solid fa-edit"></i>
@@ -367,7 +367,7 @@ tbody tr:hover {
                                                                 </span>
                                                                 <span class="text-sm text-gray-700">{{ $question->question_text }}</span>
                                                             </div>
-                                                            <a href="{{ route('inspection-types.create', ['type' => $type->id, 'header' => $header->id, 'question' => $question->id]) }}" 
+                                                            <a href="#" 
                                                                class="btn-warning text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none" 
                                                                title="Edit Pertanyaan">
                                                                 <i class="fa-solid fa-edit"></i>

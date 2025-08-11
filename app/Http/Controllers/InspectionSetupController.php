@@ -59,11 +59,15 @@ class InspectionSetupController extends Controller
             'headers.*.questions.*.text' => 'nullable|string',
         ]);
 
+        // dd($data);
+
         foreach ($data['headers'] as $headerData) {
                 $title = $headerData['title'] ?? null; // aman dari Undefined array key
                 if (!$title) {
-                    continue; // skip kalau kosong
+                    continue; // jika header tidak di isi maka skip proses ini
                 }
+
+                // dd($headerData); //debugging untuk melihat struktur data
 
                 $header = InspectionHeader::create([
                     'inspection_type_id' => $data['inspection_type_id'],
