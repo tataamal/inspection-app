@@ -31,6 +31,18 @@
     transform: scale(1) translateY(0);
 }
 
+/* Accordion Animation */
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.accordion-content.open {
+    max-height: 1000px;
+    transition: max-height 0.5s ease-in;
+}
+
 /* Button Hover Effects */
 .btn-primary {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -59,6 +71,16 @@
 .btn-warning {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateY(0);
+}
+
+.btn-danger {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
 }
 
 .btn-warning:hover {
@@ -98,7 +120,7 @@
 
 /* Table Styling */
 .table-container {
-    max-height: 400px;
+    max-height: 600px;
     overflow-y: auto;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
@@ -139,6 +161,26 @@
     padding-left: 40px;
 }
 
+/* Card hover effects */
+.header-card {
+    transition: all 0.2s ease-in-out;
+}
+
+.header-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Question item hover */
+.question-item {
+    transition: all 0.15s ease-in-out;
+}
+
+.question-item:hover {
+    background-color: #f8fafc;
+    transform: translateX(4px);
+}
+
 /* Table Row Hover */
 tbody tr {
     transition: background-color 0.15s ease-in-out;
@@ -153,65 +195,74 @@ tbody tr:hover {
     opacity: 0.6;
     pointer-events: none;
 }
+
+/* Stats Cards */
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+
+.stats-card:hover::before {
+    transform: translateX(0);
+}
+
+/* Counter badge */
+.counter-badge {
+    animation: pulse 2s infinite;
+}
 </style>
 
 <main class="flex-1 p-4 min-h-screen bg-white rounded-l-3xl shadow-inner flex flex-col">
 
-    <!-- Row: Select & Tambah Jenis Inspeksi -->
-    <div class="grid grid-cols-12 gap-4 mb-6">
-        <div class="col-span-9">
-            <label for="inspection_type_select" class="block text-lg font-medium text-gray-700 mb-2">Jenis Inspeksi</label>
-            <select id="inspection_type_select" name="inspection_type_select"
-                class="form-input w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 focus:outline-none">
-                <option value="">Pilih Jenis Inspeksi</option>
-                @foreach($inspectionTypes as $type)
-                    <option value="{{ $type->id }}">{{ $type->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-span-3 flex items-end">
-            <button id="btnOpenModal"
-                class="btn-primary w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                <i class="fa-solid fa-plus text-xs"></i>
-                Tambah Jenis Inspeksi
-            </button>
-        </div>
-    </div>
-
-    <!-- Modal Tambah Jenis Inspeksi -->
-    <div id="inspectionModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-center z-50">
-        <div class="modal-content bg-white w-full max-w-md mx-4 p-6 rounded-lg shadow-2xl">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-semibold text-gray-900">Tambahkan Jenis Inspeksi</h3>
-                <button id="btnCloseModal" class="text-gray-400 hover:text-gray-600 focus:outline-none">
-                    <i class="fa-solid fa-times text-lg"></i>
-                </button>
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white/80 text-sm">Total Jenis Inspeksi</p>
+                    <p class="text-3xl font-bold" id="totalTypes">{{ $inspectionTypes->count() }}</p>
+                </div>
+                <i class="fa-solid fa-clipboard-list text-3xl text-white/70"></i>
             </div>
-            <form id="addInspectionTypeForm" method="POST" action="{{ route('inspection-types.store') }}">
-                @csrf
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Nama Jenis Inspeksi</label>
-                    <input type="text" name="name" required
-                        class="form-input w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none"
-                        placeholder="Masukkan nama jenis inspeksi">
+        </div>
+        <div class="stats-card bg-gradient-to-r from-green-500 to-green-600">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white/80 text-sm">Total Header</p>
+                    <p class="text-3xl font-bold" id="totalHeaders">{{ $inspectionTypes->sum(function($type) { return $type->headers->count(); }) }}</p>
                 </div>
-                <div class="flex justify-end gap-3">
-                    <button type="button" id="btnCancelModal"
-                        class="btn-secondary px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-                        Batal
-                    </button>
-                    <button type="submit"
-                        class="btn-success px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                        <i class="fa-solid fa-save mr-2"></i>
-                        Simpan
-                    </button>
+                <i class="fa-solid fa-list text-3xl text-white/70"></i>
+            </div>
+        </div>
+        <div class="stats-card bg-gradient-to-r from-purple-500 to-purple-600">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white/80 text-sm">Total Pertanyaan</p>
+                    <p class="text-3xl font-bold" id="totalQuestions">{{ $inspectionTypes->sum(function($type) { return $type->headers->sum(function($header) { return $header->questions->count(); }); }) }}</p>
                 </div>
-            </form>
+                <i class="fa-solid fa-question-circle text-3xl text-white/70"></i>
+            </div>
         </div>
     </div>
 
     <!-- Header Section -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start right-2 sm:items-center gap-4 mb-6">
         
         <!-- Search and Create Button Container -->
         <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -221,59 +272,146 @@ tbody tr:hover {
                 <input type="text" id="searchInput" placeholder="Cari jenis inspeksi..."
                     class="search-input form-input w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm focus:outline-none">
             </div>
+            
+            <!-- Expand All Button -->
+            <button id="expandAllBtn"
+                class="btn-info px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2">
+                <i class="fa-solid fa-expand-alt"></i>
+                <span>Buka Semua</span>
+            </button>
+
+            <a href="{{ route('inspection-types.create') }}"><button id="addInspectionTypeBtn"
+            class="btn-primary px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center gap-2">
+                <i class="fa-solid fa-puzzle-piece"></i>
+                <span>Add Jenis Inspeksi</span>
+            </button></a>
         </div>
     </div>
 
-    <!-- Tabel Daftar Inspeksi -->
+    <!-- Inspection Types List Container -->
     <div class="table-container flex-grow">
-        <table class="w-full divide-y divide-gray-200" id="inspectionTable">
-            <thead class="bg-gray-100 text-gray-700 sticky top-0 z-10 border-2 border-gray-200 shadow-sm shadow-gray-500">
-                <tr>
-                    <th class="px-3 py-4 text-left text-md font-medium w-16">No</th>
-                    <th class="px-4 py-4 text-left text-md font-medium">Jenis Inspeksi</th>
-                    <th class="px-3 py-4 text-center text-md font-medium w-48">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200" id="tableBody">
-                @forelse ($inspectionTypes as $index => $type)
-                    <tr class="inspection-row" data-name="{{ strtolower($type->name) }}">
-                        <td class="px-3 py-4 text-sm text-gray-900 text-center font-medium border-2 border-gray-100 ">{{ $index + 1 }}</td>
-                        <td class="px-4 py-4 text-sm text-gray-900 font-medium border-2 border-gray-100 ">{{ $type->name }}</td>
-                        <td class="px-3 py-4 border-2 border-gray-100">
-                            <div class="flex justify-center gap-3">
-                                <a href="{{ route('inspection-types.show', $type->id) }}"
-                                    class="btn-info text-md bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-                                    title="Lihat Detail">
-                                    <i class="fa-solid fa-eye m-1"></i>
-                                </a>
-                                <a href="{{ route('inspection-types.create', $type->id) }}"
-                                    class="btn-warning text-md bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
-                                    title="Edit">
-                                    <i class="fa-solid fa-pen-to-square m-1"></i>
-                                </a>
-                                <button onclick="confirmDelete({{ $type->id }}, '{{ $type->name }}')"
-                                    class="btn-danger text-md bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                                    title="Hapus">
-                                    <i class="fa-solid fa-trash m-1"></i>
-                                </button>
+        <div class="space-y-4" id="inspectionTypesList">
+            
+            @forelse($inspectionTypes as $type)
+                <!-- Inspection Type Card -->
+                <div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 inspection-type-card" 
+                     data-name="{{ strtolower($type->name) }}">
+                    <div class="p-4">
+                        <!-- Type Header -->
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fa-solid fa-clipboard-check text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-900">{{ $type->name }}</h2>
+                                    <p class="text-sm text-gray-500">
+                                        {{ $type->headers->count() }} Header • 
+                                        {{ $type->headers->sum(function($header) { return $header->questions->count(); }) }} Pertanyaan
+                                    </p>
+                                </div>
                             </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr id="emptyRow">
-                        <td colspan="3" class="text-center py-8 text-gray-500">
-                            <i class="fa-solid fa-inbox text-3xl mb-2 block text-gray-300"></i>
-                            Belum ada data inspeksi.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-        
-        <!-- No Results Message -->
-        <div id="noResults" class="hidden text-center py-8 text-gray-500">
-            <i class="fa-solid fa-search text-3xl mb-2 block text-gray-300"></i>
-            Tidak ada hasil yang ditemukan.
+                            <div class="flex items-center gap-2">
+                                <span class="counter-badge bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                    ID: {{ $type->id }}
+                                </span>
+                                <button class="toggle-accordion btn-info text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded focus:outline-none" 
+                                        data-target="accordion-{{ $type->id }}">
+                                    <i class="fa-solid fa-chevron-down transition-transform duration-200"></i>
+                                </button>
+                                <a href="{{ route('inspection-types.edit', $type->id) }}" 
+                                   class="btn-warning text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded focus:outline-none" 
+                                   title="Edit Jenis Inspeksi">
+                                    <i class="fa-solid fa-edit"></i>
+                                </a>
+                                <a href="#"
+                                    class="btn-danger text-sm bg-red-800 hover:bg-red-500 text-white px-3 py-1.5 rounded focus:outline-none">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Headers Accordion -->
+                        <div class="accordion-content border-t border-gray-200 pt-3" id="accordion-{{ $type->id }}">
+                            @if($type->headers->count() > 0)
+                                <div class="space-y-3">
+                                    @foreach($type->headers as $headerIndex => $header)
+                                        <!-- Header Card -->
+                                        <div class="header-card bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 bg-green-100 rounded flex items-center justify-center">
+                                                        <i class="fa-solid fa-list text-green-600 text-xs"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="font-medium text-gray-900 text-sm">{{ $header->title }}</h3>
+                                                        <p class="text-xs text-gray-500">{{ $header->questions->count() }} Pertanyaan</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-1">
+                                                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                                                        #{{ $headerIndex + 1 }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Questions List -->
+                                            @if($header->questions->count() > 0)
+                                                <div class="space-y-1 ml-8">
+                                                    @foreach($header->questions as $questionIndex => $question)
+                                                        <div class="question-item group flex items-center justify-between p-2 bg-white rounded border border-gray-100">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                    {{ $questionIndex + 1 }}
+                                                                </span>
+                                                                <span class="text-sm text-gray-700">{{ $question->question_text }}</span>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <div class="ml-8 text-center py-4 text-gray-400 text-sm">
+                                                    <i class="fa-solid fa-question-circle mb-1 block"></i>
+                                                    Belum ada pertanyaan
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="text-center py-6 text-gray-400">
+                                    <i class="fa-solid fa-list text-2xl mb-2 block"></i>
+                                    <p class="text-sm">Belum ada header untuk jenis inspeksi ini</p>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <!-- Empty State -->
+                <div class="bg-white border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-clipboard-list text-2xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada jenis inspeksi</h3>
+                    <p class="text-gray-500 mb-4">Mulai dengan membuat jenis inspeksi pertama Anda.</p>
+                    <a href="{{ route('inspection-types.create') }}" 
+                       class="btn-primary bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <i class="fa-solid fa-plus mr-2"></i>
+                        Tambah Jenis Inspeksi
+                    </a>
+                </div>
+            @endforelse
+            
+            <!-- No Results Message -->
+            <div id="noResults" class="hidden bg-white border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-search text-2xl text-gray-400"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Tidak ada hasil ditemukan</h3>
+                <p class="text-gray-500">Coba gunakan kata kunci yang berbeda atau periksa ejaan Anda.</p>
+            </div>
+
         </div>
     </div>
 
@@ -281,272 +419,120 @@ tbody tr:hover {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Modal Elements
-    const modal = document.getElementById('inspectionModal');
-    const btnOpenModal = document.getElementById('btnOpenModal');
-    const btnCloseModal = document.getElementById('btnCloseModal');
-    const btnCancelModal = document.getElementById('btnCancelModal');
-    const modalOverlay = modal;
-
-    // Search Elements
+    // Elements
     const searchInput = document.getElementById('searchInput');
-    const tableBody = document.getElementById('tableBody');
+    const expandAllBtn = document.getElementById('expandAllBtn');
+    const inspectionTypesList = document.getElementById('inspectionTypesList');
     const noResults = document.getElementById('noResults');
+    
+    // State variables
+    let allExpanded = false;
 
-    // Modal Functions
-    function openModal() {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-        
-        // Focus on input after animation
-        setTimeout(() => {
-            const nameInput = modal.querySelector('input[name="name"]');
-            if (nameInput) nameInput.focus();
-        }, 100);
-    }
+    // Search functionality
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        const typeCards = document.querySelectorAll('.inspection-type-card');
+        let visibleCount = 0;
 
-    function closeModal() {
-        modal.classList.add('hidden');
-        document.body.style.overflow = '';
-        
-        // Reset form
-        const form = document.getElementById('addInspectionTypeForm');
-        if (form) form.reset();
-    }
-
-    // Modal Event Listeners
-    btnOpenModal.addEventListener('click', openModal);
-    btnCloseModal.addEventListener('click', closeModal);
-    btnCancelModal.addEventListener('click', closeModal);
-
-    // Close modal on overlay click
-    modalOverlay.addEventListener('click', function(e) {
-        if (e.target === modalOverlay) {
-            closeModal();
-        }
-    });
-
-    // Close modal on Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-            closeModal();
-        }
-    });
-
-    // Search Function
-    function performSearch() {
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.inspection-row');
-        const emptyRow = document.getElementById('emptyRow');
-        let visibleRows = 0;
-
-        rows.forEach((row, index) => {
-            const name = row.getAttribute('data-name');
+        typeCards.forEach(card => {
+            const name = card.getAttribute('data-name');
             const isVisible = name.includes(searchTerm);
             
-            row.style.display = isVisible ? '' : 'none';
-            
-            if (isVisible) {
-                visibleRows++;
-                // Update row number
-                const numberCell = row.querySelector('td:first-child');
-                if (numberCell) {
-                    numberCell.textContent = visibleRows;
-                }
-            }
+            card.style.display = isVisible ? 'block' : 'none';
+            if (isVisible) visibleCount++;
         });
-
-        // Hide original empty row during search
-        if (emptyRow) {
-            emptyRow.style.display = 'none';
-        }
 
         // Show/hide no results message
-        if (visibleRows === 0 && searchTerm !== '') {
+        if (visibleCount === 0 && searchTerm !== '') {
             noResults.classList.remove('hidden');
-            tableBody.style.display = 'none';
         } else {
             noResults.classList.add('hidden');
-            tableBody.style.display = '';
+        }
+    });
+
+    // Expand/Collapse All functionality
+    expandAllBtn.addEventListener('click', function() {
+        const accordions = document.querySelectorAll('.accordion-content');
+        const toggleButtons = document.querySelectorAll('.toggle-accordion');
+        
+        if (allExpanded) {
+            // Collapse all
+            accordions.forEach(accordion => {
+                accordion.classList.remove('open');
+            });
+            toggleButtons.forEach(btn => {
+                const icon = btn.querySelector('i');
+                icon.style.transform = 'rotate(0deg)';
+            });
+            this.innerHTML = '<i class="fa-solid fa-expand-alt"></i><span>Buka Semua</span>';
+            allExpanded = false;
+        } else {
+            // Expand all
+            accordions.forEach(accordion => {
+                accordion.classList.add('open');
+            });
+            toggleButtons.forEach(btn => {
+                const icon = btn.querySelector('i');
+                icon.style.transform = 'rotate(180deg)';
+            });
+            this.innerHTML = '<i class="fa-solid fa-compress-alt"></i><span>Tutup Semua</span>';
+            allExpanded = true;
+        }
+    });
+
+    // Individual accordion toggle
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.toggle-accordion')) {
+            const button = e.target.closest('.toggle-accordion');
+            const targetId = button.getAttribute('data-target');
+            const accordion = document.getElementById(targetId);
+            const icon = button.querySelector('i');
             
-            // Show empty row if no data and no search term
-            if (visibleRows === 0 && searchTerm === '' && emptyRow) {
-                emptyRow.style.display = '';
+            if (accordion.classList.contains('open')) {
+                accordion.classList.remove('open');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                accordion.classList.add('open');
+                icon.style.transform = 'rotate(180deg)';
             }
         }
-    }
+    });
 
-    // Search Event Listeners
-    searchInput.addEventListener('input', performSearch);
-    searchInput.addEventListener('keyup', performSearch);
-
-    // Form submission with loading state
-    const form = document.getElementById('addInspectionTypeForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
-                submitBtn.disabled = true;
-            }
-        });
-    }
-
-    // Add ripple effect to buttons
-    function createRipple(event) {
-        const button = event.currentTarget;
-        const circle = document.createElement('span');
-        const diameter = Math.max(button.clientWidth, button.clientHeight);
-        const radius = diameter / 2;
-
-        circle.style.width = circle.style.height = `${diameter}px`;
-        circle.style.left = `${event.clientX - button.offsetLeft - radius}px`;
-        circle.style.top = `${event.clientY - button.offsetTop - radius}px`;
-        circle.classList.add('ripple');
-
-        const ripple = button.getElementsByClassName('ripple')[0];
-        if (ripple) {
-            ripple.remove();
+    // Add loading state to edit buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('a[href*="edit"]') || e.target.closest('a[href*="create"]')) {
+            const btn = e.target.closest('a');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            btn.style.pointerEvents = 'none';
+            
+            // Reset after a delay (in case navigation fails)
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.style.pointerEvents = '';
+            }, 3000);
         }
+    });
 
-        button.appendChild(circle);
-    }
-
-    <!-- Add ripple effect to all buttons -->
-    document.querySelectorAll('button, .btn-warning, .btn-info, .btn-danger').forEach(button => {
-        button.addEventListener('click', createRipple);
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        // Press 'S' to focus search
+        if (e.key === 's' || e.key === 'S') {
+            if (e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        }
+        
+        // Press 'E' to expand/collapse all
+        if (e.key === 'e' || e.key === 'E') {
+            if (e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                expandAllBtn.click();
+            }
+        }
     });
 });
-
-// Delete Confirmation Function
-function confirmDelete(id, name) {
-    if (confirm(`Apakah Anda yakin ingin menghapus jenis inspeksi "${name}"?\n\nTindakan ini tidak dapat dibatalkan.`)) {
-        // Create form for delete request
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/inspection-types/${id}`;
-        form.style.display = 'none';
-        
-        // Add CSRF token
-        const csrfToken = document.createElement('input');
-        csrfToken.type = 'hidden';
-        csrfToken.name = '_token';
-        csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        
-        // Add method override
-        const methodOverride = document.createElement('input');
-        methodOverride.type = 'hidden';
-        methodOverride.name = '_method';
-        methodOverride.value = 'DELETE';
-        
-        form.appendChild(csrfToken);
-        form.appendChild(methodOverride);
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-// Delete Modal Alternative (more modern approach)
-function showDeleteModal(id, name) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50';
-    modal.innerHTML = `
-        <div class="modal-content bg-white w-full max-w-md mx-4 p-6 rounded-lg shadow-2xl">
-            <div class="flex items-center mb-4">
-                <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                    <i class="fa-solid fa-exclamation-triangle text-red-600"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Konfirmasi Hapus</h3>
-                </div>
-            </div>
-            <div class="mb-6">
-                <p class="text-gray-600">
-                    Apakah Anda yakin ingin menghapus jenis inspeksi <strong>"${name}"</strong>?
-                </p>
-                <p class="text-sm text-red-600 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
-            </div>
-            <div class="flex justify-end gap-3">
-                <button type="button" class="btn-secondary px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none">
-                    Batal
-                </button>
-                <button type="button" class="btn-danger px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none">
-                    <i class="fa-solid fa-trash mr-2"></i>
-                    Hapus
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    document.body.style.overflow = 'hidden';
-    
-    // Event listeners
-    const cancelBtn = modal.querySelector('.btn-secondary');
-    const deleteBtn = modal.querySelector('.btn-danger');
-    
-    const closeModal = () => {
-        document.body.removeChild(modal);
-        document.body.style.overflow = '';
-    };
-    
-    cancelBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-    
-    deleteBtn.addEventListener('click', () => {
-        // Show loading state
-        deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menghapus...';
-        deleteBtn.disabled = true;
-        
-        // Submit delete request
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/inspection-types/${id}`;
-        form.style.display = 'none';
-        
-        const csrfToken = document.createElement('input');
-        csrfToken.type = 'hidden';
-        csrfToken.name = '_token';
-        csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        
-        const methodOverride = document.createElement('input');
-        methodOverride.type = 'hidden';
-        methodOverride.name = '_method';
-        methodOverride.value = 'DELETE';
-        
-        form.appendChild(csrfToken);
-        form.appendChild(methodOverride);
-        document.body.appendChild(form);
-        form.submit();
-    });
-}
-
-// CSS for ripple effect
-const style = document.createElement('style');
-style.textContent = `
-    .ripple {
-        position: absolute;
-        border-radius: 50%;
-        transform: scale(0);
-        animation: ripple 600ms linear;
-        background-color: rgba(255, 255, 255, 0.6);
-    }
-
-    @keyframes ripple {
-        to {
-            transform: scale(4);
-            opacity: 0;
-        }
-    }
-
-    button, .btn-warning, .btn-info, .btn-danger {
-        position: relative;
-        overflow: hidden;
-    }
-`;
-document.head.appendChild(style);
 </script>
 
 @endsection

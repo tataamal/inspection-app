@@ -31,11 +31,11 @@ Route::middleware(['auth'])->group(function () {
 
 
     // routing halaman yang hanya bisa diakses oleh admin
-    Route::get('/inspection-view', [InspectionSetupController::class, 'view'])->name('inspection-view');
-    Route::get('/inspection-types', [InspectionSetupController::class, 'index'])->name('inspection-types.index');
+    Route::get('/inspection-index', [InspectionSetupController::class, 'index'])->name('inspection-types.index');
     Route::post('/inspection-types', [InspectionSetupController::class, 'store'])->name('inspection-types.store');
     Route::get('/inspection-types/{id}/edit', [InspectionSetupController::class, 'edit'])->name('inspection-types.edit');
-    Route::get('/inspection-create{id}', [InspectionSetupController::class, 'create'])->name('inspection-types.create');
+    Route::get('/inspection-create', [InspectionSetupController::class, 'create'])->name('inspection-types.create');
+    Route::put('/inspection-types/{id}', [InspectionSetupController::class, 'updateJenisInspeksi'])->name('inspection-types.update');
     Route::post('/inspection-submit-detail', [InspectionSetupController::class, 'submitDetail'])->name('inspection-types.submit_detail');
     Route::get('/inspection-show/{id}', [InspectionSetupController::class, 'show'])->name('inspection-types.show');
     Route::get('/inspection-detail', [InspectionSetupController::class, 'show'])->name('inspection-types.show');
