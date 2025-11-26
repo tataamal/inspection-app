@@ -4,8 +4,9 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\MappingUserPlant;
+use App\Models\MappingUserPlant; // Pastikan Model ini ada
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class MappingUserPlantSeeder extends Seeder
 {
@@ -14,84 +15,83 @@ class MappingUserPlantSeeder extends Seeder
      */
     public function run(): void
     {
+        $now = Carbon::now();
+
         $dataKaryawan = [
-            ["Plant"=>"1001","Mrp"=>"WW1","NIK"=>"10000096","Nama karyawan"=>"Choirul Rohman"],
-            ["Plant"=>"1001","Mrp"=>"WW2","NIK"=>"10000207","Nama karyawan"=>"Badar riyatmono"],
-            ["Plant"=>"1001","Mrp"=>"WW3","NIK"=>"10000123","Nama karyawan"=>"Candra Setiawan"],
-            ["Plant"=>"1001","Mrp"=>"WW4","NIK"=>"10000113","Nama karyawan"=>"Itsna Yuli Choirurrohman"],
-            ["Plant"=>"1000","Mrp"=>"WE1","NIK"=>"10000164","Nama karyawan"=>"Bambang Prayitno"],
-            ["Plant"=>"1000","Mrp"=>"WE2","NIK"=>"10000164","Nama karyawan"=>"Bambang Prayitno"],
-            ["Plant"=>"1000","Mrp"=>"WM1","NIK"=>"10000029","Nama karyawan"=>"Mas Arif Rumadi"],
-            ["Plant"=>"1000","Mrp"=>"PN1","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"PN2","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"PN3","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"VN1","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"VN2","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"PV1","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"1000","Mrp"=>"PV2","NIK"=>"10000020","Nama karyawan"=>"Muhammad Syaroni"],
-            ["Plant"=>"2000","Mrp"=>"GA1","NIK"=>"10000424","Nama karyawan"=>"M.ZAINUDDIN"],
-            ["Plant"=>"2000","Mrp"=>"GA1","NIK"=>"10000432","Nama karyawan"=>"NUR SALIM"],
-            ["Plant"=>"2000","Mrp"=>"GA2","NIK"=>"10000424","Nama karyawan"=>"M.ZAINUDDIN"],
-            ["Plant"=>"2000","Mrp"=>"GA2","NIK"=>"10000432","Nama karyawan"=>"NUR SALIM"],
-            ["Plant"=>"2000","Mrp"=>"GD1","NIK"=>"10000505","Nama karyawan"=>"PURWANTO"],
-            ["Plant"=>"2000","Mrp"=>"GD1","NIK"=>"10000437","Nama karyawan"=>"SUPRIANTO"],
-            ["Plant"=>"2000","Mrp"=>"GD2","NIK"=>"10000505","Nama karyawan"=>"PURWANTO"],
-            ["Plant"=>"2000","Mrp"=>"GD2","NIK"=>"10000437","Nama karyawan"=>"SUPRIANTO"],
-            ["Plant"=>"2000","Mrp"=>"EB2","NIK"=>"10000471","Nama karyawan"=>"SIGIT WIDODO"],
-            ["Plant"=>"2000","Mrp"=>"C11","NIK"=>"10000487","Nama karyawan"=>"Hariyono"],
-            ["Plant"=>"2000","Mrp"=>"C12","NIK"=>"10000429","Nama karyawan"=>"Beni Sunarko"],
-            ["Plant"=>"2000","Mrp"=>"RD2","NIK"=>"10000644","Nama karyawan"=>"AGUS SUPRIYANTO"],
-            ["Plant"=>"2000","Mrp"=>"RD3","NIK"=>"10000427","Nama karyawan"=>"ERWIN MOHTAR AFFANDI"],
-            ["Plant"=>"2000","Mrp"=>"RD4","NIK"=>"10000615","Nama karyawan"=>"MUCHAMAD AL-AMIN"],
-            ["Plant"=>"2000","Mrp"=>"CH1","NIK"=>"10000526","Nama karyawan"=>"Andri Wahyu Pradana"],
-            ["Plant"=>"2000","Mrp"=>"CH2","NIK"=>"10000466","Nama karyawan"=>"Agus Suherianto"],
-            ["Plant"=>"2000","Mrp"=>"CH4","NIK"=>"10000428","Nama karyawan"=>"hari susanto"],
-            ["Plant"=>"2000","Mrp"=>"CH5","NIK"=>"10003386","Nama karyawan"=>"CATUR HERI P"],
-            ["Plant"=>"2000","Mrp"=>"CH7","NIK"=>"10000466","Nama karyawan"=>"Agus Suherianto"],
-            ["Plant"=>"2000","Mrp"=>"CH8","NIK"=>"10000466","Nama karyawan"=>"Agus Suherianto"],
-            ["Plant"=>"2000","Mrp"=>"CH9","NIK"=>"10000466","Nama karyawan"=>"Agus Suherianto"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000388","Nama karyawan"=>"Abd Kholiq Idris"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000587","Nama karyawan"=>"Moch Darmawan Eko P"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000544","Nama karyawan"=>"Mochamad Choirudin"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000413","Nama karyawan"=>"Arif Budi Prasetya"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000410","Nama karyawan"=>"Dian Prasetyo"],
-            ["Plant"=>"2000","Mrp"=>"GF1","NIK"=>"10000544","Nama karyawan"=>"Sunarto"],
-            ["Plant"=>"2000","Mrp"=>"GF2","NIK"=>"10000881","Nama karyawan"=>"Saiful Mutohar"],
-            ["Plant"=>"2000","Mrp"=>"GF2","NIK"=>"10000661","Nama karyawan"=>"Angga Setyawan"],
-            ["Plant"=>"2000","Mrp"=>"GF2","NIK"=>"10000619","Nama karyawan"=>"Eko Setiawan"],
-            ["Plant"=>"2000","Mrp"=>"MF1","NIK"=>"10000045","Nama karyawan"=>"SURANTO"],
-            ["Plant"=>"2000","Mrp"=>"MF2","NIK"=>"10000045","Nama karyawan"=>"SURANTO"],
-            ["Plant"=>"2000","Mrp"=>"MF3","NIK"=>"10000045","Nama karyawan"=>"Suranto"],
-            ["Plant"=>"2000","Mrp"=>"MF4","NIK"=>"10000045","Nama karyawan"=>"Suranto"],
-            ["Plant"=>"2000","Mrp"=>"CP1","NIK"=>"10002225","Nama karyawan"=>"Risma Choirun Nissa"],
-            ["Plant"=>"2000","Mrp"=>"CP2","NIK"=>"10002225","Nama karyawan"=>"Risma Choirun Nissa"],
-            ["Plant"=>"2000","Mrp"=>"CP3","NIK"=>"10002225","Nama karyawan"=>"Risma Choirun Nissa"],
-            ["Plant"=>"2000","Mrp"=>"CSK","NIK"=>"10002225","Nama karyawan"=>"Risma Choirun Nissa"],
-            ["Plant"=>"3000","Mrp"=>"D22","NIK"=>"10002069","Nama karyawan"=>null],
-            ["Plant"=>"3000","Mrp"=>"PG2","NIK"=>"10002260","Nama karyawan"=>null],
-            ["Plant"=>"3000","Mrp"=>"MW1","NIK"=>"10000900","Nama karyawan"=>null],
-            ["Plant"=>"3000","Mrp"=>"MW2","NIK"=>"10000900","Nama karyawan"=>null],
-            ["Plant"=>"3000","Mrp"=>"MW3","NIK"=>"10000900","Nama karyawan"=>null],
-            ["Plant"=>"3000","Mrp"=>"D21","NIK"=>"10002555","Nama karyawan"=>null]
+            ["plant"=>"1001","mrp"=>"WW1","nik"=>"10000096","nama_karyawan"=>"Choirul Rohman","sap_id"=>"KMI-U081"],
+            ["plant"=>"1001","mrp"=>"WW2","nik"=>"10000207","nama_karyawan"=>"Badar riyatmono","sap_id"=>"KMI-U082"],
+            ["plant"=>"1001","mrp"=>"WW3","nik"=>"10000123","nama_karyawan"=>"Candra Setiawan","sap_id"=>"KMI-U081"],
+            ["plant"=>"1001","mrp"=>"WW4","nik"=>"10000113","nama_karyawan"=>"Itsna Yuli Choirurrohman","sap_id"=>"KMI-U081"], // Spasi dihapus
+            ["plant"=>"1000","mrp"=>"WE1","nik"=>"10000164","nama_karyawan"=>"Bambang Prayitno","sap_id"=>"KMI-U086"],
+            ["plant"=>"1000","mrp"=>"WE2","nik"=>"10000164","nama_karyawan"=>"Bambang Prayitno","sap_id"=>"KMI-U086"],
+            ["plant"=>"1000","mrp"=>"WM1","nik"=>"10000029","nama_karyawan"=>"Mas Arif Rumadi","sap_id"=>"KMI-U165"],
+            ["plant"=>"1000","mrp"=>"PN1","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U083"],
+            ["plant"=>"1000","mrp"=>"PN2","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U110"],
+            ["plant"=>"1000","mrp"=>"PN3","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U110"],
+            ["plant"=>"1000","mrp"=>"VN1","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U097"],
+            ["plant"=>"1000","mrp"=>"VN2","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U097"],
+            ["plant"=>"1000","mrp"=>"PV1","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U097"],
+            ["plant"=>"1000","mrp"=>"PV2","nik"=>"10000020","nama_karyawan"=>"Muhammad Syaroni","sap_id"=>"KMI-U097"],
+            ["plant"=>"2000","mrp"=>"GA1","nik"=>"10000424","nama_karyawan"=>"M.ZAINUDDIN","sap_id"=>"KMI-U088"],
+            ["plant"=>"2000","mrp"=>"GA1","nik"=>"10000432","nama_karyawan"=>"NUR SALIM","sap_id"=>"KMI-U088"],
+            ["plant"=>"2000","mrp"=>"GA2","nik"=>"10000424","nama_karyawan"=>"M.ZAINUDDIN","sap_id"=>"KMI-U088"],
+            ["plant"=>"2000","mrp"=>"GA2","nik"=>"10000432","nama_karyawan"=>"NUR SALIM","sap_id"=>"KMI-U088"],
+            ["plant"=>"2000","mrp"=>"GD1","nik"=>"10000505","nama_karyawan"=>"PURWANTO","sap_id"=>"KMI-U085"],
+            ["plant"=>"2000","mrp"=>"GD1","nik"=>"10000437","nama_karyawan"=>"SUPRIANTO","sap_id"=>"KMI-U085"],
+            ["plant"=>"2000","mrp"=>"GD2","nik"=>"10000505","nama_karyawan"=>"PURWANTO","sap_id"=>"KMI-U085"],
+            ["plant"=>"2000","mrp"=>"GD2","nik"=>"10000437","nama_karyawan"=>"SUPRIANTO","sap_id"=>"KMI-U085"],
+            ["plant"=>"2000","mrp"=>"EB2","nik"=>"10000471","nama_karyawan"=>"SIGIT WIDODO","sap_id"=>"KMI-U088"],
+            ["plant"=>"2000","mrp"=>"C11","nik"=>"10000487","nama_karyawan"=>"Hariyono","sap_id"=>"KMI-U098"],
+            ["plant"=>"2000","mrp"=>"C12","nik"=>"10000429","nama_karyawan"=>"Beni Sunarko","sap_id"=>"KMI-U098"],
+            ["plant"=>"2000","mrp"=>"RD2","nik"=>"10000644","nama_karyawan"=>"AGUS SUPRIYANTO","sap_id"=>"KMI-U100"],
+            ["plant"=>"2000","mrp"=>"RD3","nik"=>"10000427","nama_karyawan"=>"ERWIN MOHTAR AFFANDI","sap_id"=>"KMI-U100"],
+            ["plant"=>"2000","mrp"=>"RD4","nik"=>"10000615","nama_karyawan"=>"MUCHAMAD AL-AMIN","sap_id"=>"KMI-U100"],
+            ["plant"=>"2000","mrp"=>"CH1","nik"=>"10000526","nama_karyawan"=>"Andri Wahyu Pradana","sap_id"=>"KMI-U090"],
+            ["plant"=>"2000","mrp"=>"CH2","nik"=>"10000466","nama_karyawan"=>"Agus Suherianto","sap_id"=>"KMI-U090"],
+            ["plant"=>"2000","mrp"=>"CH4","nik"=>"10000428","nama_karyawan"=>"hari susanto","sap_id"=>"KMI-U091"],
+            ["plant"=>"2000","mrp"=>"CH5","nik"=>"10003386","nama_karyawan"=>"CATUR HERI P","sap_id"=>"KMI-U091"],
+            ["plant"=>"2000","mrp"=>"CH7","nik"=>"10000466","nama_karyawan"=>"Agus Suherianto","sap_id"=>"KMI-U091"],
+            ["plant"=>"2000","mrp"=>"CH8","nik"=>"10000466","nama_karyawan"=>"Agus Suherianto","sap_id"=>"KMI-U090"],
+            ["plant"=>"2000","mrp"=>"CH9","nik"=>"10000466","nama_karyawan"=>"Agus Suherianto","sap_id"=>"KMI-U090"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000388","nama_karyawan"=>"Abd Kholiq Idris","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000587","nama_karyawan"=>"Moch Darmawan Eko P","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000544","nama_karyawan"=>"Mochamad Choirudin","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000413","nama_karyawan"=>"Arif Budi Prasetya","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000410","nama_karyawan"=>"Dian Prasetyo","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF1","nik"=>"10000544","nama_karyawan"=>"Sunarto","sap_id"=>"KMI-U095"],
+            ["plant"=>"2000","mrp"=>"GF2","nik"=>"10000881","nama_karyawan"=>"Saiful Mutohar","sap_id"=>"KMI-U096"],
+            ["plant"=>"2000","mrp"=>"GF2","nik"=>"10000661","nama_karyawan"=>"Angga Setyawan","sap_id"=>"KMI-U096"],
+            ["plant"=>"2000","mrp"=>"GF2","nik"=>"10000619","nama_karyawan"=>"Eko Setiawan","sap_id"=>"KMI-U096"],
+            ["plant"=>"2000","mrp"=>"MF1","nik"=>"10000045","nama_karyawan"=>"SURANTO","sap_id"=>"KMI-U115"],
+            ["plant"=>"2000","mrp"=>"MF2","nik"=>"10000045","nama_karyawan"=>"SURANTO","sap_id"=>"KMI-U129"],
+            ["plant"=>"2000","mrp"=>"MF3","nik"=>"10000045","nama_karyawan"=>"Suranto","sap_id"=>"KMI-U115"],
+            ["plant"=>"2000","mrp"=>"MF4","nik"=>"10000045","nama_karyawan"=>"Suranto","sap_id"=>"KMI-U141"],
+            ["plant"=>"2000","mrp"=>"CP1","nik"=>"10002225","nama_karyawan"=>"Risma Choirun Nissa","sap_id"=>"KMI-U114"],
+            ["plant"=>"2000","mrp"=>"CP2","nik"=>"10002225","nama_karyawan"=>"Risma Choirun Nissa","sap_id"=>"KMI-U114"],
+            ["plant"=>"2000","mrp"=>"CP3","nik"=>"10002225","nama_karyawan"=>"Risma Choirun Nissa","sap_id"=>"KMI-U114"],
+            ["plant"=>"2000","mrp"=>"CSK","nik"=>"10002225","nama_karyawan"=>"Risma Choirun Nissa","sap_id"=>"KMI-U114"],
+            ["plant"=>"2000","mrp"=>"GT1","nik"=>"10000074","nama_karyawan"=>"Risma Choirun Nissa","sap_id"=>"KMI-U121"],
+            ["plant"=>"3000","mrp"=>"D22","nik"=>"10002069","nama_karyawan"=>"BENIYANTO","sap_id"=>"KMI-U128"], 
+            ["plant"=>"3000","mrp"=>"PG2","nik"=>"10002260","nama_karyawan"=>"Mustolihul Hasan","sap_id"=>"KMI-U143"],
+            ["plant"=>"3000","mrp"=>"MW1","nik"=>"10000900","nama_karyawan"=>"Mursalin","sap_id"=>"KMI-U132"],
+            ["plant"=>"3000","mrp"=>"MW2","nik"=>"10000900","nama_karyawan"=>"Mursalin","sap_id"=>"KMI-U132"],
+            ["plant"=>"3000","mrp"=>"MW3","nik"=>"10000900","nama_karyawan"=>"Mursalin","sap_id"=>"KMI-U132"],
+            ["plant"=>"3000","mrp"=>"D21","nik"=>"10002555","nama_karyawan"=>"Heri Prima Setiawan","sap_id"=>"KMI-U117"]
         ];
 
-        // Mulai Transaksi agar lebih cepat
-        DB::beginTransaction();
-        
-        try {
-            foreach ($dataKaryawan as $row) {
-                MappingUserPlant::create([
-                    'plant'         => $row['Plant'],
-                    'mrp'           => $row['Mrp'],
-                    'nik'           => $row['NIK'],
-                    'nama_karyawan' => $row['Nama karyawan'],
-                    'sap_id'        => null,
-                ]);
-            }
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        // Saya juga mengubah key array di atas menjadi huruf kecil semua (plant, mrp, dst) 
+        // agar sesuai langsung dengan nama kolom database. Jika Anda pakai MappingUserPlant::insert(), 
+        // nama key HARUS persis dengan nama kolom database.
+
+        // Tambahkan timestamp untuk setiap row (karena insert bulk tidak otomatis menambahkannya)
+        $dataToInsert = array_map(function($item) use ($now) {
+            return array_merge($item, [
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }, $dataKaryawan);
+
+        // Gunakan insert() agar lebih performant (hanya 1 query ke DB)
+        MappingUserPlant::insert($dataToInsert);
     }
 }

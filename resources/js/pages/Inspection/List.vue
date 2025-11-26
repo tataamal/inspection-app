@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import axios from 'axios';
 
-// 1. Props
 const props = defineProps({
     initialLots: Array,
     dispoCode: String,
@@ -11,11 +11,19 @@ const props = defineProps({
     errorMessage: String
 });
 
-// 2. State
+// --- STATE ---
 const searchQuery = ref('');
 const isRefreshing = ref(false);
+const selectedLots = ref([]);
 
-// 3. Filtering
+// Modal State
+const showModal = ref(false);
+const isLoadingComponents = ref(false);
+const selectedComponents = ref([]);
+const selectedLotNumber = ref('');
+const selectedOrderNumber = ref('');
+
+// --- COMPUTED ---
 const filteredLots = computed(() => {
     if (!searchQuery.value) return props.initialLots;
     const lowerSearch = searchQuery.value.toLowerCase();
@@ -28,241 +36,362 @@ const filteredLots = computed(() => {
     );
 });
 
-// 4. Actions
+const isAllSelected = computed(() => filteredLots.value.length > 0 && selectedLots.value.length === filteredLots.value.length);
+const isIndeterminate = computed(() => selectedLots.value.length > 0 && selectedLots.value.length < filteredLots.value.length);
+
+// --- ACTIONS ---
 const refreshData = () => {
     isRefreshing.value = true;
-    router.reload({
-        only: ['initialLots', 'errorMessage'],
-        onFinish: () => { isRefreshing.value = false; }
-    });
+    router.reload({ only: ['initialLots', 'errorMessage'], onFinish: () => { isRefreshing.value = false; } });
 };
 
 const formatDate = (dateStr) => {
     if(!dateStr) return '-';
-    const y = dateStr.substring(0,4);
-    const m = dateStr.substring(4,6);
-    const d = dateStr.substring(6,8);
-    return `${d}/${m}/${y}`;
+    return `${dateStr.substring(6,8)}/${dateStr.substring(4,6)}/${dateStr.substring(0,4)}`;
 };
 
-const processLot = (lot) => {
-    router.get(`/inspection/form/${lot.PRUEFLOS}`, {
-        plant: props.plantCode,
-        dispo: props.dispoCode 
-    });
+// --- SELECTION LOGIC ---
+const toggleSelection = (id) => {
+    if (selectedLots.value.includes(id)) {
+        selectedLots.value = selectedLots.value.filter(lotId => lotId !== id);
+    } else {
+        selectedLots.value.push(id);
+    }
 };
+
+const toggleSelectAll = () => selectedLots.value = isAllSelected.value ? [] : filteredLots.value.map(lot => lot.PRUEFLOS);
+const clearSelection = () => selectedLots.value = [];
+
+const bulkPass = () => {
+    if (confirm(`Loloskan ${selectedLots.value.length} lot inspeksi ini?`)) {
+        router.post('/inspection/bulk-pass', { lots: selectedLots.value, plant: props.plantCode }, { onSuccess: () => clearSelection() });
+    }
+};
+
+// --- MODAL LOGIC ---
+const openComponentModal = async (lot) => {
+    selectedLotNumber.value = lot.PRUEFLOS;
+    selectedOrderNumber.value = lot.AUFNR;
+    selectedComponents.value = [];
+    isLoadingComponents.value = true;
+    showModal.value = true;
+    if (!lot.AUFNR) { isLoadingComponents.value = false; return; }
+    try {
+        const response = await axios.get(`/inspection/components/${lot.AUFNR}`);
+        selectedComponents.value = response.data.data;
+    } catch (e) { console.error(e); } 
+    finally { isLoadingComponents.value = false; }
+};
+
+const closeModal = () => { showModal.value = false; setTimeout(() => selectedComponents.value = [], 300); };
 </script>
 
 <template>
-    <Head title="Daftar Inspeksi" />
+    <Head title="Inspection List" />
 
-    <div class="relative min-h-screen bg-slate-900 font-sans text-slate-200 overflow-hidden selection:bg-emerald-500 selection:text-white flex flex-col">
+    <div class="relative h-[100dvh] w-full bg-[#0B1120] font-sans text-slate-200 flex flex-col overflow-hidden">
         
-        <div class="fixed inset-0 z-0 pointer-events-none">
-            <div class="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0a3d2e]"></div>
-            <div class="absolute -top-[10%] -right-[10%] w-[500px] h-[500px] bg-emerald-500 rounded-full blur-[80px] opacity-15 animate-float-1"></div>
-            <div class="absolute -bottom-[10%] -left-[5%] w-[400px] h-[400px] bg-emerald-600 rounded-full blur-[80px] opacity-15 animate-float-2"></div>
-            <div class="absolute inset-0 grid-pattern"></div>
+        <!-- Background Effects -->
+        <div class="absolute inset-0 z-0 pointer-events-none">
+            <div class="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#064e3b] opacity-80"></div>
+            <div class="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[80px] animate-pulse"></div>
+            <div class="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[60px] animate-pulse delay-1000"></div>
+            <div class="absolute inset-0 grid-pattern opacity-20"></div>
         </div>
 
-        <nav class="sticky top-0 z-50 w-full bg-[#0f172a]/80 backdrop-blur-xl border-b border-emerald-500/10 shadow-md">
-            <div class="max-w-[1400px] mx-auto px-6 py-3 flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <img src="/images/KMI.png" alt="Logo" class="h-8 w-auto" />
-                    <div class="flex flex-col">
-                        <h3 class="text-white font-bold text-base leading-tight">KMI Inspection</h3>
-                        <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest">Quality Control</span>
-                    </div>
+        <!-- Navigation Bar -->
+        <nav class="relative z-50 shrink-0 w-full bg-[#0f172a]/80 backdrop-blur-xl border-b border-white/5 h-16 flex items-center justify-between px-4 md:px-8">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 bg-emerald-500 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center font-black text-black text-lg">K</div>
+                <div class="flex flex-col">
+                    <h3 class="text-white font-bold text-sm md:text-base leading-none tracking-tight">KMI Inspection</h3>
+                    <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest mt-0.5">Quality Control</span>
                 </div>
-                <div class="text-sm font-medium text-slate-400">
-                    Hello, <span class="text-emerald-400">{{ props.authUser.username }}</span>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="hidden flex-col items-end mr-2 md:flex">
+                    <span class="text-[0.65rem] text-slate-400 uppercase font-bold tracking-wider">Operator</span>
+                    <span class="text-sm font-bold text-emerald-400 leading-none">{{ props.authUser.username }}</span>
+                </div>
+                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-white shadow-inner">
+                    {{ props.authUser.username.charAt(0) }}
                 </div>
             </div>
         </nav>
 
-        <main class="relative z-10 flex-1 flex flex-col max-w-[1400px] w-full mx-auto p-4 md:p-8">
-            
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 shrink-0 gap-4">
-                <div class="space-y-3">
-                    <Link href="/dashboard" class="group inline-flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors">
-                        <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-emerald-500/20 group-hover:-translate-x-1 transition-all">
-                            <i class="fa-solid fa-arrow-left text-sm"></i>
-                        </div>
-                        <span class="font-medium text-sm">Kembali ke Dashboard</span>
-                    </Link>
-                    
-                    <div>
-                        <h1 class="text-3xl font-extrabold text-white tracking-tight">Daftar Inspeksi</h1>
-                        <div class="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-                            <i class="fa-solid fa-layer-group"></i>
-                            MRP Controller: {{ props.dispoCode }}
-                        </div>
-                    </div>
-                </div>
-
-                <button 
-                    @click="refreshData" 
-                    :disabled="isRefreshing"
-                    class="px-5 py-2.5 rounded-xl bg-slate-800 border border-white/10 text-white font-semibold text-sm shadow-lg hover:border-emerald-500/50 hover:bg-slate-700 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                >
-                    <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
-                    <span>{{ isRefreshing ? 'Sinkronisasi...' : 'Refresh Data' }}</span>
-                </button>
-            </div>
-
-            <div class="flex flex-col bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden w-full">
+        <!-- Header / Controls -->
+        <div class="relative z-40 shrink-0 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 shadow-xl">
+            <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-6">
                 
-                <div class="p-4 border-b border-white/5 bg-[#0f172a]/40 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-                    <div class="relative w-full max-w-md group">
-                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors"></i>
-                        <input 
-                            v-model="searchQuery" 
-                            type="text" 
-                            placeholder="Cari Lot, Material, Batch..." 
-                            class="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:bg-black/30 transition-all"
-                        >
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-3">
+                        <Link href="/dashboard" class="w-8 h-8 rounded-full bg-white/5 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 flex items-center justify-center transition-all">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </Link>
+                        <div>
+                            <h1 class="text-xl md:text-2xl font-bold text-white leading-none">Inspection List</h1>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[0.65rem] font-mono text-slate-500">MRP:</span>
+                                <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{{ props.dispoCode }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-xs font-medium text-slate-400">
-                        Total: <b class="text-white">{{ filteredLots.length }}</b> Item
-                    </div>
+                    
+                    <button @click="refreshData" :disabled="isRefreshing" class="w-9 h-9 md:w-auto md:h-auto md:px-4 md:py-2 rounded-xl bg-slate-800 border border-white/10 text-white flex items-center justify-center gap-2 hover:bg-slate-700 transition-all active:scale-95">
+                        <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
+                        <span class="hidden md:inline text-sm font-semibold">{{ isRefreshing ? 'Syncing...' : 'Refresh' }}</span>
+                    </button>
                 </div>
 
-                <div class="overflow-y-auto max-h-[500px] scrollbar-thin scrollbar-track-slate-800/20 scrollbar-thumb-emerald-500/30 hover:scrollbar-thumb-emerald-500/50">
-                    
-                    <div v-if="props.errorMessage" class="flex flex-col items-center justify-center py-10 text-center text-slate-400">
-                        <div class="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 text-2xl mb-4">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
+                <div class="flex gap-3">
+                    <div class="relative flex-1 group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-magnifying-glass text-slate-500 group-focus-within:text-emerald-500 transition-colors"></i>
                         </div>
-                        <h3 class="text-white font-bold text-lg mb-1">Terjadi Kesalahan</h3>
-                        <p class="text-sm max-w-xs">{{ props.errorMessage }}</p>
+                        <input v-model="searchQuery" type="text" placeholder="Search Lot, Material, Batch..." class="block w-full pl-10 pr-3 py-2.5 bg-black/20 border border-white/10 rounded-xl leading-5 text-slate-300 placeholder-slate-500 focus:outline-none focus:bg-black/40 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 sm:text-sm transition-all shadow-inner">
                     </div>
+                    <button @click="toggleSelectAll" class="md:hidden px-3 rounded-xl border border-white/10 bg-white/5 text-slate-300 active:bg-emerald-500/20 active:border-emerald-500/50 active:text-emerald-400 transition-colors flex items-center justify-center min-w-[3rem]">
+                        <i :class="isAllSelected ? 'fa-solid fa-check-square text-emerald-500' : 'fa-regular fa-square'"></i>
+                    </button>
+                </div>
 
-                    <div v-else-if="props.initialLots.length === 0" class="flex flex-col items-center justify-center py-10 text-center text-slate-400">
-                        <div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center text-slate-600 text-3xl mb-4">
-                            <i class="fa-solid fa-folder-open"></i>
-                        </div>
-                        <h3 class="text-white font-bold text-lg mb-1">Tidak Ada Data</h3>
-                        <p class="text-sm">Tidak ditemukan inspection lot aktif untuk MRP <b>{{ props.dispoCode }}</b>.</p>
-                    </div>
-
-                    <div v-else-if="filteredLots.length === 0" class="flex flex-col items-center justify-center py-10 text-center text-slate-400">
-                        <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-slate-600 text-2xl mb-4">
-                            <i class="fa-solid fa-filter-circle-xmark"></i>
-                        </div>
-                        <p class="text-sm">Tidak ditemukan data dengan kata kunci "<b>{{ searchQuery }}</b>"</p>
-                    </div>
-
-                    <table v-else class="w-full text-left border-collapse">
-                        <thead class="sticky top-0 z-20 bg-[#0f172a] shadow-md border-b border-white/10">
-                            <tr>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Inspection Lot</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">PRO</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Material</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Batch Info</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Qty</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Tanggal</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
-                                <th class="py-4 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        
-                        <tbody class="divide-y divide-white/5">
-                            <tr 
-                                v-for="(lot, index) in filteredLots" 
-                                :key="lot.PRUEFLOS" 
-                                class="hover:bg-emerald-500/5 transition-colors group animate-fade-in-up"
-                                :style="{ animationDelay: `${index * 0.03}s` }"
-                            >
-                                <td class="py-4 px-6">
-                                    <div class="flex flex-col">
-                                        <span class="font-bold text-white text-sm">{{ lot.PRUEFLOS }}</span>
-                                        <span class="text-[0.65rem] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded w-fit">{{ props.plantCode }}</span>
-                                    </div>
-                                </td>
-                                
-                                <td class="py-4 px-6 text-sm text-slate-300 font-mono">{{ lot.AUFNR }}</td>
-                                
-                                <td class="py-4 px-6">
-                                    <div class="flex flex-col">
-                                        <span class="font-semibold text-slate-200 text-sm">{{ lot.KTEXTMAT }}</span>
-                                        <span class="text-xs text-slate-500 font-mono">{{ lot.MATNR }}</span>
-                                    </div>
-                                </td>
-
-                                <td class="py-4 px-6">
-                                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-medium">
-                                        <i class="fa-solid fa-box"></i> {{ lot.CHARG }}
-                                    </div>
-                                </td>
-
-                                <td class="py-4 px-6 text-sm text-slate-300 font-mono font-bold">
-                                    {{ parseInt(lot.LOSMENGE) }} <span class="text-xs font-normal text-slate-500">{{ lot.MENGENEINH === 'ST' ? 'PC' : lot.MENGENEINH }}</span>
-                                </td>
-
-                                <td class="py-4 px-6 text-sm text-slate-400 whitespace-nowrap">
-                                    <i class="fa-regular fa-calendar mr-1.5 text-slate-600"></i> {{ formatDate(lot.ENSTEHDAT) }}
-                                </td>
-
-                                <td class="py-4 px-6">
-                                    <span 
-                                        class="px-3 py-1 rounded-full text-[0.7rem] font-bold border"
-                                        :class="{
-                                            'bg-emerald-500/10 border-emerald-500/20 text-emerald-400': !lot.STATS || lot.STATS === 'REL',
-                                            'bg-indigo-500/10 border-indigo-500/20 text-indigo-400': lot.STATS === 'UD',
-                                            'bg-slate-500/10 border-slate-500/20 text-slate-400': lot.STATS !== 'REL' && lot.STATS !== 'UD'
-                                        }"
-                                    >
-                                        {{ lot.STATS || 'REL' }}
-                                    </span>
-                                </td>
-
-                                <td class="py-4 px-6 text-right right-0 z-10 bg-[#162032] group-hover:bg-[#1a283f] border-l border-white/5 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
-                                    <button 
-                                        @click="processLot(lot)"
-                                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all hover:pr-5 group/btn"
-                                    >
-                                        <span>Inspect</span> <i class="fa-solid fa-magnifying-glass text-[0.6rem] transition-transform group-hover/btn:scale-110"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="flex justify-between items-center mt-3 text-[0.7rem] font-medium text-slate-400 uppercase tracking-wider">
+                    <span>Total Data: <b class="text-white">{{ filteredLots.length }}</b></span>
+                    <span v-if="selectedLots.length > 0" class="text-emerald-400 animate-pulse">{{ selectedLots.length }} Selected</span>
                 </div>
             </div>
+        </div>
 
-        </main>
+        <!-- Main Content (Scrollable) -->
+        <div class="flex-1 overflow-y-auto relative z-10 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700" id="scrollContainer">
+            <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 pb-32"> 
+
+                <div v-if="filteredLots.length === 0" class="flex flex-col items-center justify-center h-64 text-slate-500">
+                    <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl mb-4">
+                        <i class="fa-solid fa-inbox"></i>
+                    </div>
+                    <p class="text-sm">No inspection lots found.</p>
+                </div>
+
+                <div v-else>
+                    
+                    <!-- Mobile View -->
+                    <div class="md:hidden space-y-3 mt-4">
+                        <div 
+                            v-for="(lot, index) in filteredLots" 
+                            :key="lot.PRUEFLOS"
+                            class="relative bg-[#162032] rounded-2xl p-4 border border-white/5 shadow-lg active:scale-[0.99] transition-all duration-200"
+                            :class="{'ring-1 ring-emerald-500 bg-emerald-900/10': selectedLots.includes(lot.PRUEFLOS)}"
+                        >
+                            <div class="absolute top-0 right-0 p-4 z-10" @click.stop="toggleSelection(lot.PRUEFLOS)">
+                                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors bg-[#0f172a]"
+                                    :class="selectedLots.includes(lot.PRUEFLOS) ? 'border-emerald-500 bg-emerald-500 text-black' : 'border-slate-600 text-transparent'">
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                </div>
+                            </div>
+
+                            <div class="pr-8 mb-3">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-lg font-bold text-white tracking-wide">{{ lot.PRUEFLOS }}</span>
+                                    <span v-if="lot.STATS === 'UD'" class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-indigo-500/20 text-indigo-300">UD</span>
+                                    <span v-else class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-emerald-500/20 text-emerald-400">REL</span>
+                                </div>
+                                <div class="text-xs text-slate-400 font-mono">PRO: <span class="text-slate-200">{{ lot.AUFNR }}</span></div>
+                            </div>
+
+                            <div class="mb-4">
+                                <p class="text-sm font-semibold text-slate-100 line-clamp-2 leading-snug">{{ lot.KTEXTMAT }}</p>
+                                <div class="mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    <span class="px-2 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 whitespace-nowrap font-mono">{{ lot.MATNR }}</span>
+                                    <span class="px-2 py-1 rounded-md bg-sky-500/10 border border-sky-500/10 text-[0.65rem] text-sky-400 whitespace-nowrap font-mono flex items-center gap-1">
+                                        <i class="fa-solid fa-box text-[0.6rem]"></i> {{ lot.CHARG }}
+                                    </span>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+                                    <div class="flex items-center gap-1"><i class="fa-regular fa-calendar"></i> {{ formatDate(lot.ENSTEHDAT) }}</div>
+                                    <div class="font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-white/5">{{ parseInt(lot.LOSMENGE) }} <span class="text-[0.6rem] font-normal text-slate-500">{{ lot.MENGENEINH }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-[3rem_1fr] gap-2">
+                                <button @click.stop="openComponentModal(lot)" class="h-10 rounded-xl bg-[#1e293b] border border-white/5 flex items-center justify-center text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors"><i class="fa-solid fa-boxes-stacked"></i></button>
+                                
+                                <!-- FIXED MOBILE BUTTON -->
+                                <!-- Removed :data, using explicit query string -->
+                                <div @click.stop>
+                                    <Link 
+                                        :href="`/inspection/form/${lot.PRUEFLOS}?plant=${props.plantCode}&dispo=${props.dispoCode}`"
+                                        class="h-10 rounded-xl bg-emerald-600 flex items-center justify-center gap-2 text-white font-bold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:translate-y-0.5 transition-all w-full"
+                                    >
+                                        <span>Inspect</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Desktop View -->
+                    <div class="hidden md:block mt-6">
+                        <div class="bg-[#162032]/50 rounded-2xl border border-white/5 pb-2">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 w-12 text-center rounded-tl-2xl border-b border-white/10 shadow-sm">
+                                            <input type="checkbox" :checked="isAllSelected" :indeterminate="isIndeterminate" @change="toggleSelectAll" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer">
+                                        </th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Lot & Order</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Components</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Material Desc</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Batch</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Qty</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider rounded-tr-2xl border-b border-white/10 shadow-sm">Action</th>
+                                    </tr>
+                                </thead>
+                                
+                                <tbody class="divide-y divide-white/5 text-sm">
+                                    <tr v-for="(lot, index) in filteredLots" :key="lot.PRUEFLOS" 
+                                        class="hover:bg-white/5 transition-colors group relative" 
+                                        :class="{'bg-emerald-500/5': selectedLots.includes(lot.PRUEFLOS)}">
+                                        
+                                        <td class="py-4 px-4 text-center">
+                                            <input type="checkbox" v-model="selectedLots" :value="lot.PRUEFLOS" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer">
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <div class="font-bold text-white">{{ lot.PRUEFLOS }}</div>
+                                            <div class="text-xs text-slate-500 font-mono mt-0.5">{{ lot.AUFNR }}</div>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <button @click="openComponentModal(lot)" class="px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white text-xs font-bold transition-all flex items-center gap-2">
+                                                <i class="fa-solid fa-boxes-stacked"></i> View
+                                            </button>
+                                        </td>
+                                        <td class="py-4 px-4 max-w-[250px]">
+                                            <div class="text-slate-200 font-medium truncate" :title="lot.KTEXTMAT">{{ lot.KTEXTMAT }}</div>
+                                            <div class="text-xs text-slate-500 font-mono">{{ lot.MATNR }}</div>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <span class="px-2 py-1 rounded bg-sky-500/10 text-sky-400 text-xs font-mono border border-sky-500/10">{{ lot.CHARG }}</span>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <span class="text-white font-bold">{{ parseInt(lot.LOSMENGE) }}</span> 
+                                            <span class="text-xs text-slate-500 ml-1">{{ lot.MENGENEINH }}</span>
+                                        </td>
+                                        <td class="py-4 px-4 text-right">
+                                            <!-- FIXED DESKTOP BUTTON -->
+                                            <!-- Removed as="button" and type="button" to render standard <a> tag -->
+                                            <!-- Used manual query string construction -->
+                                            <div @click.stop class="inline-block">
+                                                <Link 
+                                                    :href="`/inspection/form/${lot.PRUEFLOS}?plant=${props.plantCode}&dispo=${props.dispoCode}`"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all hover:pr-5 group/btn cursor-pointer"
+                                                >
+                                                    <span>Inspect</span> <i class="fa-solid fa-arrow-right opacity-0 group-hover/btn:opacity-100 -translate-x-2 group-hover/btn:translate-x-0 transition-all"></i>
+                                                </Link>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Selection Bar -->
+        <Transition enter-active-class="transition ease-out duration-300" enter-from-class="translate-y-full opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition ease-in duration-200" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-full opacity-0">
+            <div v-if="selectedLots.length > 0" class="absolute bottom-6 left-0 right-0 z-50 flex justify-center px-4">
+                <div class="bg-[#1e293b]/90 backdrop-blur-xl border border-emerald-500/30 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] py-2 pl-4 pr-2 flex items-center gap-4 animate-bounce-subtle">
+                    <div class="flex items-center gap-3 border-r border-white/10 pr-4">
+                        <span class="w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-xs font-bold">{{ selectedLots.length }}</span>
+                        <span class="text-sm font-medium text-white hidden md:inline">Selected</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="clearSelection" class="w-8 h-8 rounded-full hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <button @click="bulkPass" class="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold shadow-lg hover:bg-emerald-500 transition-all active:scale-95 flex items-center gap-2">
+                            <i class="fa-solid fa-check-double"></i> Pass
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+
+        <!-- Components Modal -->
+        <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95" enter-to-class="opacity-100 translate-y-0 md:scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 translate-y-0 md:scale-100" leave-to-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95">
+            <div v-if="showModal" class="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
+                <div @click="closeModal" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
+                
+                <div class="relative w-full md:max-w-2xl bg-[#0f172a] border-t md:border border-white/10 rounded-t-3xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
+                    
+                    <div class="md:hidden w-full flex justify-center pt-3 pb-1">
+                        <div class="w-12 h-1.5 rounded-full bg-white/20"></div>
+                    </div>
+
+                    <div class="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                                <i class="fa-solid fa-boxes-stacked text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-white leading-none">Order Components</h3>
+                                <p class="text-xs text-slate-500 mt-1 font-mono">Lot: {{ selectedLotNumber }}</p>
+                            </div>
+                        </div>
+                        <button @click="closeModal" class="w-8 h-8 rounded-full bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 bg-[#0B1120] scrollbar-thin">
+                        <div v-if="isLoadingComponents" class="flex flex-col items-center justify-center py-10 text-emerald-500/50 animate-pulse">
+                            <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2"></i>
+                            <span class="text-xs font-bold uppercase tracking-widest">Loading SAP Data...</span>
+                        </div>
+                        <div v-else-if="selectedComponents.length === 0" class="py-10 text-center text-slate-500">
+                            <i class="fa-regular fa-folder-open text-3xl mb-2 opacity-50"></i>
+                            <p class="text-sm">No components found.</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="(comp, i) in selectedComponents" :key="i" class="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                                <div class="mt-0.5 w-6 h-6 rounded bg-[#0f172a] border border-white/10 flex items-center justify-center text-[0.65rem] font-mono text-slate-400 shrink-0">{{ comp.RSPOS }}</div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start">
+                                        <h4 class="text-sm font-bold text-white leading-snug">{{ comp.MAKTX }}</h4>
+                                        <div class="text-right shrink-0 ml-2">
+                                            <div class="text-sm font-bold text-emerald-400">{{ parseFloat(comp.BDMNG) }}</div>
+                                            <div class="text-[0.6rem] font-bold text-slate-500 uppercase">{{ comp.MEINS }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                                        <span class="px-1.5 py-0.5 rounded bg-black/40 border border-white/5 text-[0.6rem] font-mono text-slate-400">{{ comp.MATNR }}</span>
+                                        <span v-if="comp.CHARGX2" class="px-1.5 py-0.5 rounded bg-sky-900/20 border border-sky-500/20 text-[0.6rem] font-mono text-sky-400">Batch: {{ comp.CHARGX2 }}</span>
+                                        <span v-if="comp.inspector_details" class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[0.6rem] text-indigo-300">
+                                            <i class="fa-solid fa-user-clock text-[0.55rem]"></i> {{ comp.inspector_details.nama }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
     </div>
 </template>
 
 <style scoped>
-/* Animations (Sama) */
 .grid-pattern {
-    background-image: linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px), 
-                      linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    animation: gridMove 20s linear infinite;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), 
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
 }
-
-@keyframes float { 
-    0%, 100% { transform: translate(0, 0); } 
-    50% { transform: translate(30px, -30px); } 
-}
-@keyframes gridMove { 
-    0% { transform: translate(0, 0); } 
-    100% { transform: translate(50px, 50px); } 
-}
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-float-1 { animation: float 20s ease-in-out infinite; }
-.animate-float-2 { animation: float 20s ease-in-out infinite 5s; }
-.animate-fade-in-up { animation: fadeInUp 0.4s ease-out backwards; }
-
-/* Scrollbar Style */
-.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scrollbar-track-slate-800\/20::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.2); }
-.scrollbar-thumb-emerald-500\/30::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.3); border-radius: 10px; }
-.scrollbar-thumb-emerald-500\/30::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.5); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-track-transparent::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thumb-slate-700::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 </style>

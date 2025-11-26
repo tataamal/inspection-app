@@ -43,7 +43,7 @@ const submit = () => {
                 <div class="text-center mb-9">
                     <div class="relative w-[90px] h-[90px] mx-auto mb-5 flex items-center justify-center bg-white/5 rounded-[22px] border border-white/10 shadow-lg group">
                         <div class="absolute inset-0 rounded-[22px] bg-radial-glow opacity-60 blur-md"></div>
-                        <img src="/images/kmi.png" alt="Logo KMI" class="w-[60px] h-auto relative z-10 drop-shadow-md" />
+                        <img src="/images/KMI.png" alt="Logo KMI" class="w-[60px] h-auto relative z-10 drop-shadow-md" />
                     </div>
                     
                     <div class="space-y-1">

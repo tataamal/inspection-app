@@ -8,20 +8,20 @@ use App\Http\Controllers\InspectionController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/', [AuthController::class, 'showLogin'])->name('login');
-    // Ini yang akan dipanggil oleh Vue (form.post('/login'))
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Protected Routes
-Route::middleware('auth_custom')->group(function () { // Nanti kita buat middleware custom cek Redis
-    Route::get('/dashboard', function () {
-        return inertia('Dashboard'); 
-    })->name('dashboard');
+// ✅ MASUKKAN ROUTE INSPECTION KE DALAM MIDDLEWARE AGAR AMAN
+Route::middleware('auth_custom')->group(function () { 
     
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-});
 
-Route::middleware(['auth_custom'])->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-Route::get('/inspection/{dispo}', [InspectionController::class, 'index'])->name('inspection.index');
-Route::get('/inspection/form/{lotNumber}', [InspectionController::class, 'showForm'])->name('inspection.form');
-Route::post('/inspection/submit', [InspectionController::class, 'store'])->name('inspection.submit');
+    // Inspection Routes (Pindahkan ke sini)
+    Route::get('/inspection/components/{aufnr}', [InspectionController::class, 'getComponents']);
+    Route::get('/inspection/form/{lotNumber}', [InspectionController::class, 'showForm'])->name('inspection.form');
+    Route::post('/inspection/submit', [InspectionController::class, 'store'])->name('inspection.submit');
+    
+    // Route Index sebaiknya ditaruh paling bawah jika menggunakan parameter dinamis agar tidak bentrok
+    Route::get('/inspection/{dispo}', [InspectionController::class, 'index'])->name('inspection.index');
+});

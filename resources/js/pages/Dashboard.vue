@@ -64,7 +64,7 @@ const logout = () => {
             <div class="max-w-[1400px] mx-auto px-6 py-4 flex justify-between items-center">
                 
                 <div class="flex items-center gap-4">
-                    <img src="/images/kmi-logo.png" alt="KMI Logo" class="h-10 w-auto drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]" />
+                    <img src="/images/KMI.png" alt="KMI Logo" class="h-10 w-auto drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]" />
                     <div class="flex flex-col">
                         <h3 class="text-white font-extrabold text-lg tracking-tight leading-tight">KMI Inspection</h3>
                         <span class="text-emerald-500 text-[0.65rem] font-bold uppercase tracking-widest">Quality Control System</span>
