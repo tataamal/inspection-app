@@ -18,6 +18,7 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $sapBaseUrl = config('services.sap.url');
         $credentials = $request->validate([
             'username' => ['required'],
             'password' => ['required'],
@@ -28,7 +29,7 @@ class AuthController extends Controller
         Log::info("[AUTH] Percobaan login user: {$username}");
 
         try {
-            $response = Http::timeout(30)->post('http://127.0.0.1:4003/api/sap-login', [
+            $response = Http::timeout(30)->post("{$sapBaseUrl}/api/sap-login", [
                 'username' => $credentials['username'],
                 'password' => $credentials['password'],
             ]);

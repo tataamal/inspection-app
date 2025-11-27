@@ -23,13 +23,14 @@ class InspectionController extends Controller
         $inspectionLots = [];
         $components = []; 
         $errorMsg = null;
+        $sapBaseUrl = config('services.sap.url');
 
         if (Redis::exists($redisKey)) {
             try {
                 $decrypted = Crypt::decryptString(Redis::get($redisKey));
                 $userData = json_decode($decrypted, true);
                 
-                $response = Http::timeout(60)->get('http://127.0.0.1:4003/api/get_insp_lot', [
+                $response = Http::timeout(60)->get(get("{$sapBaseUrl}/api/get_insp_lot", [
                     'plant'    => $plant,
                     'username' => $userData['username'],
                     'password' => $userData['password'], 
@@ -69,7 +70,7 @@ class InspectionController extends Controller
             'plantCode'   => $plant,
             'errorMessage'=> $errorMsg,
             'authUser'    => [
-                'username' => $userData['username'] ?? 'User',
+            'username' => $userData['username'] ?? 'User',
             ]
         ]);
     }
@@ -79,7 +80,8 @@ class InspectionController extends Controller
         // 1. Setup Session (Sama)
         $sessionId = $request->session()->getId();
         $userData = ['username' => 'Guest', 'nik' => ''];
-        $password = ''; 
+        $password = '';
+        $sapBaseUrl = config('services.sap.url'); 
 
         if (Redis::exists("sap_session:{$sessionId}")) {
             try {
@@ -98,7 +100,7 @@ class InspectionController extends Controller
         $targetLot = null;
 
         try {
-            $response = Http::timeout(30)->get('http://127.0.0.1:4003/api/get_insp_lot', [
+            $response = Http::timeout(30)->get("{$sapBaseUrl}/api/get_insp_lot", [
                 'plant'    => $plant,
                 'username' => $userData['username'],
                 'password' => $password,
