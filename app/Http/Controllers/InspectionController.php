@@ -224,9 +224,9 @@ class InspectionController extends Controller
         }
         $udConfig = [];
         if (in_array($requestPlant, ['3000', '1000', '1001'])) {
-            $udConfig = ['plant' => '1000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'Z1', 'ud_code' => 'A', 'stock_posting' => 'X'];
+            $udConfig = ['plant' => '1000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'Z1', 'ud_code' => 'A'];
         } else if ($requestPlant == '2000') {
-            $udConfig = ['plant' => '2000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'ZI', 'ud_code' => 'A', 'stock_posting' => 'X'];
+            $udConfig = ['plant' => '2000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'ZI', 'ud_code' => 'A'];
         } else {
             return response()->json(['status' => 'error', 'message' => "Plant {$requestPlant} tidak valid."], 400);
         }
@@ -273,7 +273,7 @@ class InspectionController extends Controller
                         'ud_selected_set' => $udConfig['ud_selected_set'],
                         'ud_code_group'   => $udConfig['ud_code_group'],
                         'ud_code'         => $udConfig['ud_code'],
-                        'stock_posting'   => $udConfig['stock_posting']
+                        'stock_posting'   => "X"
                     ];
 
                     $response = Http::timeout(60)->post("{$sapBaseUrl}/api/send_usage_decision", $payload);
