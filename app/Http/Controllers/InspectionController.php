@@ -25,12 +25,14 @@ class InspectionController extends Controller
         $errorMsg = null;
         $sapBaseUrl = config('services.sap.url');
 
+        if (!app()->runningInConsole()) {
+
         if (Redis::exists($redisKey)) {
             try {
                 $decrypted = Crypt::decryptString(Redis::get($redisKey));
                 $userData = json_decode($decrypted, true);
-                
-                $response = Http::timeout(60)->get(get("{$sapBaseUrl}/api/get_insp_lot", [
+
+                $response = Http::timeout(60)->get("{$sapBaseUrl}/api/get_insp_lot", [
                     'plant'    => $plant,
                     'username' => $userData['username'],
                     'password' => $userData['password'], 
@@ -39,17 +41,18 @@ class InspectionController extends Controller
 
                 if ($response->successful()) {
                     $jsonResponse = $response->json();
-                    
+
                     // [PERBAIKAN DISINI] 
-                    // Mengambil key 'data' karena Node.js sekarang mengirim { data: [...], ... }
+                    // mengambil key 'data' karena Node.js sekarang mengirim { data: [...], ... }
                     $inspectionLots = $jsonResponse['data'] ?? [];
-                    
-                    // Fallback: Jaga-jaga jika API masih mengirim format lama
+
+                    // fallback: format lama
                     if (empty($inspectionLots)) {
-                         $inspectionLots = $jsonResponse['data_insp_lot'] ?? [];
+                        $inspectionLots = $jsonResponse['data_insp_lot'] ?? [];
                     }
 
-                    $components = $jsonResponse['data_components'] ?? []; 
+                    $components = $jsonResponse['data_components'] ?? [];
+
                 } else {
                     $errorMsg = 'Gagal mengambil data dari SAP. Status: ' . $response->status();
                     Log::error("SAP Error Response: " . $response->body());
@@ -59,9 +62,18 @@ class InspectionController extends Controller
                 Log::error("Error fetching inspection lots: " . $e->getMessage());
                 $errorMsg = 'Terjadi kesalahan koneksi ke server SAP.';
             }
+
         } else {
             return to_route('login')->withErrors(['username' => 'Sesi habis.']);
         }
+
+    } else {
+
+        // Jika dijalankan oleh CLI (artisan, wayfinder, dll)
+        // jangan memanggil Redis, Crypt, atau API
+        $inspectionLots = [];
+        $components = [];
+    }
 
         return Inertia::render('Inspection/List', [
             'initialLots' => $inspectionLots,
