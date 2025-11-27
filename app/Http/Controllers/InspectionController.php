@@ -220,35 +220,15 @@ class InspectionController extends Controller
         $lotsData = $request->input('lots', []); 
         $requestPlant = $request->input('plant'); 
         if (empty($requestPlant)) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Parameter Plant wajib dikirim.'
-            ], 400);
+            return response()->json(['status' => 'error', 'message' => 'Plant wajib dikirim.'], 400);
         }
         $udConfig = [];
         if (in_array($requestPlant, ['3000', '1000', '1001'])) {
-            $udConfig = [
-                'plant'           => '1000',
-                'ud_code_group'   => 'ZI',
-                'ud_selected_set' => 'Z1',
-                'ud_code'         => 'A',
-                'stock_posting'   => 'X'
-            ];
-        } 
-        else if ($requestPlant == '2000') {
-            $udConfig = [
-                'plant'           => '2000',
-                'ud_code_group'   => 'ZI',
-                'ud_selected_set' => 'ZI',
-                'ud_code'         => 'A',
-                'stock_posting'   => 'X'
-            ];
-        } 
-        else {
-            return response()->json([
-                'status'  => 'error',
-                'message' => "Konfigurasi UD untuk Plant {$requestPlant} tidak ditemukan / tidak diizinkan."
-            ], 400);
+            $udConfig = ['plant' => '1000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'Z1', 'ud_code' => 'A', 'stock_posting' => 'X'];
+        } else if ($requestPlant == '2000') {
+            $udConfig = ['plant' => '2000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'ZI', 'ud_code' => 'A', 'stock_posting' => 'X'];
+        } else {
+            return response()->json(['status' => 'error', 'message' => "Plant {$requestPlant} tidak valid."], 400);
         }
         $sapUsername = '';
         $sapPassword = '';
@@ -268,38 +248,27 @@ class InspectionController extends Controller
                 $sapNik      = $sess['nik'] ?? ''; 
             }
         } catch (\Exception $e) {
-            Log::error("Redis Session Error: " . $e->getMessage());
-            return response()->json([
-                'status' => 'error', 
-                'message' => 'Gagal membaca sesi server.'
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Sesi Redis Error.'], 401);
         }
+
         if (empty($sapUsername) || empty($sapPassword) || empty($sapNik)) {
-            return response()->json([
-                'status' => 'error', 
-                'message' => 'Sesi Validasi Gagal: NIK atau Password tidak ditemukan. Silakan Login ulang.'
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Sesi Invalid (NIK/Pass kosong). Login ulang.'], 401);
         }
         return response()->stream(function () use ($lotsData, $requestPlant, $udConfig, $sapUsername, $sapPassword, $sapNik) {
-            
             $sapBaseUrl = config('services.sap.url');
-
             foreach ($lotsData as $lotRaw) {
                 $lot = (object) $lotRaw; 
                 $lotNumber = $lot->PRUEFLOS ?? null;
-                
                 if (!$lotNumber) continue; 
-
                 $status = 'ERROR';
                 $message = 'Unknown Error';
-            
+
                 try {
                     $payload = [
                         'prueflos'        => $lotNumber,
-                        'username'        => $sapUsername, // Untuk Login SAP
-                        'password'        => $sapPassword, // Untuk Login SAP
-                        'nik'             => $sapNik,      // Untuk Field "Recorded By" & Log
-                        
+                        'username'        => $sapUsername,
+                        'password'        => $sapPassword,
+                        'nik'             => $sapNik,
                         'plant'           => $udConfig['plant'], 
                         'ud_selected_set' => $udConfig['ud_selected_set'],
                         'ud_code_group'   => $udConfig['ud_code_group'],
@@ -312,7 +281,7 @@ class InspectionController extends Controller
 
                     if ($response->successful() && ($resData['status'] ?? '') == 'success') {
                         $status = 'SUCCESS';
-                        $message = $resData['message'] ?? 'Usage Decision Posted';
+                        $message = $resData['message'] ?? 'Posted';
                     } else {
                         $status = 'ERROR';
                         $message = $resData['message'] ?? 'SAP Error';
@@ -323,7 +292,6 @@ class InspectionController extends Controller
                     $message = $e->getMessage();
                 }
 
-                // --- B. SIMPAN HISTORY (MENGGUNAKAN DATA REDIS) ---
                 try {
                     HistoryQualityManagement::create([
                         'prueflos'           => $lotNumber,
@@ -334,11 +302,8 @@ class InspectionController extends Controller
                         'batch'              => $lot->CHARG ?? null,
                         'quantity'           => $lot->LOSMENGE ?? 0,
                         'uom'                => $lot->MENGENEINH ?? null,
-                        'customer'           => $lot->KUNNR ?? null,
-                        'vendor'             => $lot->LIFNR ?? null,
-                        'inspector_username' => $sapUsername, 
-                        'inspector_sap_id'   => $sapUsername,
-                        'nik'                => $sapNik,
+                        'inspector_sap_id'   => $sapUsername, 
+                        'inspector_nik'      => $sapNik,                  
                         'ud_code'            => $udConfig['ud_code'],
                         'ud_selected_set'    => $udConfig['ud_selected_set'],
                         'status'             => $status,
@@ -347,7 +312,7 @@ class InspectionController extends Controller
                     ]);
 
                 } catch (\Exception $dbEx) {
-                    Log::error("DB History Error Lot {$lotNumber}: " . $dbEx->getMessage());
+                    Log::error("DB Save Fail Lot {$lotNumber}: " . $dbEx->getMessage());
                 }
                 echo json_encode([
                     'lot' => $lotNumber,
@@ -359,6 +324,7 @@ class InspectionController extends Controller
                 flush();
             }
 
+            // Tanda Selesai
             echo json_encode(['status' => 'DONE']) . "\n";
             if (ob_get_level() > 0) ob_flush();
             flush();

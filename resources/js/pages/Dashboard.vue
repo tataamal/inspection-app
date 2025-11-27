@@ -1,45 +1,30 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-
-// 1. Menerima Data dari Laravel (Controller)
 const props = defineProps({
-    authUser: Object, // Data { username, nik }
-    mrpList: Array    // Data MRP List dari database
+    authUser: Object, 
+    mrpList: Array
 });
-
-// 2. State Lokal
 const searchQuery = ref('');
-const processingMrp = ref(null); // Melacak card mana yang sedang loading
-
-// 3. Filter Search (Client-side)
+const processingMrp = ref(null);
 const filteredMrp = computed(() => {
     if (!searchQuery.value) return props.mrpList;
-    
     const lowerSearch = searchQuery.value.toLowerCase();
     return props.mrpList.filter(mrp => 
         mrp.code.toLowerCase().includes(lowerSearch) || 
         (mrp.name && mrp.name.toLowerCase().includes(lowerSearch))
     );
 });
-
-// 4. Navigasi ke List Inspeksi (Mengambil Data Segar dari SAP)
 const goToInspectionList = (mrpItem) => {
-    // Set status loading untuk card spesifik ini
     processingMrp.value = mrpItem.code;
-
-    // Request ke Backend Laravel -> Controller akan tembak SAP
     router.get(`/inspection/${mrpItem.code}`, { 
         plant: mrpItem.plant 
     }, {
-        // Jika user membatalkan atau terjadi error sebelum pindah halaman
         onFinish: () => {
             processingMrp.value = null;
         }
     });
 };
-
-// 5. Logout Action
 const logout = () => {
     router.post('/logout');
 };

@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class HistoryQualityManagement extends Model
 {
     use HasFactory;
+    protected $table = 'history_quality_management';
     protected $guarded = ['id'];
 
     protected $casts = [
-        'full_lot_snapshot' => 'array', 
+        'full_lot_snapshot' => 'array', // Auto convert JSON
         'quantity' => 'decimal:3',
-        'ud_code' => 'string',
     ];
     public function getOriginalArtAttribute()
     {

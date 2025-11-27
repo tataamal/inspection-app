@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'; // Added nextTick
+import { ref, computed, nextTick, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -11,27 +11,20 @@ const props = defineProps({
     authUser: Object,
     errorMessage: String
 });
-
-// --- STATE ---
 const searchQuery = ref('');
 const isRefreshing = ref(false);
-const selectedLots = ref([]); // Array of PRUEFLOS strings
-
-// Bulk Process State (The Final Boss Logic)
+const selectedLots = ref([]);
 const isProcessingBulk = ref(false);
+const isSyncing = ref(false);
 const showProgressModal = ref(false);
 const progressLogs = ref([]);
 const progressStats = ref({ success: 0, fail: 0, total: 0 });
-const logContainerRef = ref(null); // Ref untuk auto-scroll terminal
-
-// Modal Components State
+const logContainerRef = ref(null);
 const showModal = ref(false);
 const isLoadingComponents = ref(false);
 const selectedComponents = ref([]);
 const selectedLotNumber = ref('');
 const selectedOrderNumber = ref('');
-
-// --- COMPUTED ---
 const filteredLots = computed(() => {
     if (!searchQuery.value) return props.initialLots;
     const lowerSearch = searchQuery.value.toLowerCase();
@@ -43,22 +36,16 @@ const filteredLots = computed(() => {
         (lot.AUFNR && lot.AUFNR.toLowerCase().includes(lowerSearch))
     );
 });
-
 const isAllSelected = computed(() => filteredLots.value.length > 0 && selectedLots.value.length === filteredLots.value.length);
 const isIndeterminate = computed(() => selectedLots.value.length > 0 && selectedLots.value.length < filteredLots.value.length);
-
-// --- ACTIONS ---
 const refreshData = () => {
     isRefreshing.value = true;
     router.reload({ only: ['initialLots', 'errorMessage'], onFinish: () => { isRefreshing.value = false; } });
 };
-
 const formatDate = (dateStr) => {
     if(!dateStr) return '-';
     return `${dateStr.substring(6,8)}/${dateStr.substring(4,6)}/${dateStr.substring(0,4)}`;
 };
-
-// --- SELECTION LOGIC ---
 const toggleSelection = (id) => {
     if (selectedLots.value.includes(id)) {
         selectedLots.value = selectedLots.value.filter(lotId => lotId !== id);
@@ -66,15 +53,10 @@ const toggleSelection = (id) => {
         selectedLots.value.push(id);
     }
 };
-
 const toggleSelectAll = () => selectedLots.value = isAllSelected.value ? [] : filteredLots.value.map(lot => lot.PRUEFLOS);
 const clearSelection = () => selectedLots.value = [];
-
-// --- THE FINAL BOSS: BULK PASS STREAMING ---
 const bulkPass = async () => {
     if (selectedLots.value.length === 0) return;
-
-    // --- PENGGANTIAN ALERT BROWSER KE SWEETALERT ---
     const result = await Swal.fire({
         title: 'Konfirmasi Usage Decision',
         html: `
@@ -83,97 +65,109 @@ const bulkPass = async () => {
         `,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#059669', // Emerald-600 (Sesuai tema)
-        cancelButtonColor: '#ef4444',  // Red-500
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#ef4444', 
         confirmButtonText: 'Ya, Submit UD!',
         cancelButtonText: 'Batal',
-        background: '#1e293b', // Slate-800 (Dark Mode Background)
-        color: '#f8fafc',      // Slate-50 (Text Color)
+        background: '#1e293b',
+        color: '#f8fafc',
         customClass: {
-            popup: 'border border-white/10 rounded-2xl shadow-2xl', // Styling tambahan
+            popup: 'border border-white/10 rounded-2xl shadow-2xl',
             title: 'text-xl font-bold text-white'
         }
     });
 
-    // Jika user klik Batal / Klik luar area, hentikan proses
     if (!result.isConfirmed) return;
-
-    // --- LANJUT KE LOGIKA ASLI (TIDAK ADA YANG BERUBAH DI BAWAH SINI) ---
-    
-    // 1. Siapkan Data Lengkap (Full Object Snapshot)
     const fullLotsData = props.initialLots.filter(lot => selectedLots.value.includes(lot.PRUEFLOS));
-
-    // 2. Reset UI State
     isProcessingBulk.value = true;
+    isSyncing.value = false;
     showProgressModal.value = true;
     progressLogs.value = [];
     progressStats.value = { success: 0, fail: 0, total: selectedLots.value.length };
 
-    // ... sisa kode fetch streaming sama persis seperti sebelumnya ...
     try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (!csrfToken) throw new Error("CSRF Token missing.");
         const response = await fetch('/inspection/bulk-pass', {
-             // ... (kode fetch sama) ...
-             method: 'POST',
-             headers: {
+            method: 'POST',
+            headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify({
                 lots: fullLotsData,
-                plant: props.plantCode,
+                plant: props.plantCode
             })
         });
-
-        // ... (kode reader stream sama) ...
+        if (response.status === 419) throw new Error("Sesi Kadaluarsa. Silakan refresh halaman.");
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
         while (true) {
-             // ... (kode looping stream sama) ...
-             const { done, value } = await reader.read();
-             if (done) break;
+            const { done, value } = await reader.read();
+            if (done) break;
 
-             buffer += decoder.decode(value, { stream: true });
-             const lines = buffer.split("\n");
-             buffer = lines.pop(); 
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
 
-             for (const line of lines) {
+            for (const line of lines) {
                 if (!line.trim()) continue;
                 try {
                     const data = JSON.parse(line);
                     if (data.status === 'DONE') {
+                        isSyncing.value = true;
+                        router.reload({
+                            only: ['initialLots'],
+                            onFinish: () => {
+                                isProcessingBulk.value = false;
+                                isSyncing.value = false;
+                                showProgressModal.value = false;
+                                clearSelection();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Selesai!',
+                                    text: 'Seluruh proses UD berhasil dicatat.',
+                                    timer: 2000,
+                                    showConfirmButton: false,
+                                    background: '#1e293b',
+                                    color: '#fff'
+                                });
+                            }
+                        });
                     } else {
                         progressLogs.value.push(data);
-                        if(data.status === 'SUCCESS') progressStats.value.success++;
+                        if (data.status === 'SUCCESS') progressStats.value.success++;
                         else progressStats.value.fail++;
-                        
                         nextTick(() => {
                             if (logContainerRef.value) {
                                 logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
                             }
                         });
                     }
-                } catch (e) { console.error(e); }
+                } catch (e) { 
+                    console.error("Parse Error:", e); 
+                }
             }
         }
-
     } catch (error) {
-        progressLogs.value.push({ lot: 'SYSTEM', status: 'ERROR', message: `Connection Failed: ${error.message}` });
-    } finally {
+        progressLogs.value.push({ 
+            lot: 'SYSTEM', 
+            status: 'ERROR', 
+            message: `Connection Failed: ${error.message}` 
+        });
         isProcessingBulk.value = false;
-        router.reload({ only: ['initialLots'] });
-        clearSelection();
     }
 };
 
 const closeProgressModal = () => {
-    showProgressModal.value = false;
+    if(!isProcessingBulk.value && !isSyncing.value) {
+        showProgressModal.value = false;
+    }
 };
-
-// --- COMPONENT MODAL LOGIC ---
 const openComponentModal = async (lot) => {
     selectedLotNumber.value = lot.PRUEFLOS;
     selectedOrderNumber.value = lot.AUFNR;
@@ -195,20 +189,18 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
     <Head title="Inspection List" />
 
     <div class="relative h-[100dvh] w-full bg-[#0B1120] font-sans text-slate-200 flex flex-col overflow-hidden">
-        
         <div class="absolute inset-0 z-0 pointer-events-none">
             <div class="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#064e3b] opacity-80"></div>
             <div class="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[80px] animate-pulse"></div>
             <div class="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[60px] animate-pulse delay-1000"></div>
             <div class="absolute inset-0 grid-pattern opacity-20"></div>
         </div>
-
         <nav class="relative z-50 shrink-0 w-full bg-[#0f172a]/80 backdrop-blur-xl border-b border-white/5 h-16 flex items-center justify-between px-4 md:px-8">
             <div class="flex items-center gap-3">
-                <div class="h-9 w-9 bg-emerald-500 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center font-black text-black text-lg">K</div>
+                <img src="/images/KMI.png" alt="KMI Logo" class="h-10 w-auto drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]" />
                 <div class="flex flex-col">
                     <h3 class="text-white font-bold text-sm md:text-base leading-none tracking-tight">KMI Inspection</h3>
-                    <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest mt-0.5">Quality Control</span>
+                    <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest mt-0.5">Quality Control System</span>
                 </div>
             </div>
             
@@ -222,7 +214,6 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
             </div>
         </nav>
-
         <div class="relative z-40 shrink-0 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 shadow-xl">
             <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-6">
                 
@@ -266,7 +257,6 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
             </div>
         </div>
-
         <div class="flex-1 overflow-y-auto relative z-10 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700" id="scrollContainer">
             <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 pb-32"> 
 
@@ -278,7 +268,6 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
 
                 <div v-else>
-                    
                     <div class="md:hidden space-y-3 mt-4">
                         <div v-for="(lot, index) in filteredLots" :key="lot.PRUEFLOS" class="relative bg-[#162032] rounded-2xl p-4 border border-white/5 shadow-lg active:scale-[0.99] transition-all duration-200" :class="{'ring-1 ring-emerald-500 bg-emerald-900/10': selectedLots.includes(lot.PRUEFLOS)}">
                             <div class="absolute top-0 right-0 p-4 z-10" @click.stop="toggleSelection(lot.PRUEFLOS)">
@@ -318,6 +307,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                         </div>
                     </div>
 
+                    <!-- Desktop View -->
                     <div class="hidden md:block mt-6">
                         <div class="bg-[#162032]/50 rounded-2xl border border-white/5 pb-2">
                             <table class="w-full text-left border-collapse">
@@ -371,11 +361,11 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                             </table>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
 
+        <!-- Floating Selection Bar -->
         <Transition enter-active-class="transition ease-out duration-300" enter-from-class="translate-y-full opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition ease-in duration-200" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-full opacity-0">
             <div v-if="selectedLots.length > 0" class="absolute bottom-6 left-0 right-0 z-50 flex justify-center px-4">
                 <div class="bg-[#1e293b]/90 backdrop-blur-xl border border-emerald-500/30 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] py-2 pl-4 pr-2 flex items-center gap-4 animate-bounce-subtle">
@@ -395,6 +385,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
             </div>
         </Transition>
 
+        <!-- Components Modal -->
         <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95" enter-to-class="opacity-100 translate-y-0 md:scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 translate-y-0 md:scale-100" leave-to-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95">
             <div v-if="showModal" class="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
                 <div @click="closeModal" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
@@ -451,6 +442,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
             </div>
         </Transition>
 
+        <!-- THE FINAL BOSS: PROGRESS TERMINAL MODAL -->
         <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
             <div v-if="showProgressModal" class="fixed inset-0 z-[120] flex items-center justify-center px-4">
                 <div class="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
@@ -511,21 +503,33 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                         </div>
                     </div>
 
+                    <!-- Footer Actions -->
                     <div class="p-4 border-t border-white/5 bg-white/5 flex justify-between items-center">
                         <div class="text-xs text-slate-500">
-                           <span v-if="isProcessingBulk"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Do not close window.</span>
-                           <span v-else class="text-emerald-500"><i class="fa-solid fa-circle-check mr-1"></i> All tasks completed.</span>
+                           <span v-if="isProcessingBulk && !isSyncing">
+                               <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Executing transactions...
+                           </span>
+                           <span v-else-if="isSyncing" class="text-indigo-400">
+                               <i class="fa-solid fa-arrows-rotate fa-spin mr-1"></i> Syncing latest data...
+                           </span>
+                           <span v-else class="text-emerald-500">
+                               <i class="fa-solid fa-circle-check mr-1"></i> All Done.
+                           </span>
                         </div>
-                        <button @click="closeProgressModal" :disabled="isProcessingBulk" 
+                        
+                        <button @click="closeProgressModal" 
+                                :disabled="isProcessingBulk || isSyncing" 
                                 class="px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
-                                :class="isProcessingBulk ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-white/5' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 active:scale-95'">
-                            <span>{{ isProcessingBulk ? 'Processing...' : 'Close & Refresh' }}</span>
+                                :class="(isProcessingBulk || isSyncing) ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-white/5' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg'">
+                            
+                            <span v-if="isSyncing">Syncing...</span>
+                            <span v-else-if="isProcessingBulk">Processing...</span>
+                            <span v-else>Close</span>
                         </button>
                     </div>
                 </div>
             </div>
         </Transition>
-
     </div>
 </template>
 
