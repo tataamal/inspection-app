@@ -238,7 +238,7 @@ const submitFinal = () => {
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Quantity</label>
                             <p class="text-white font-bold text-xl font-mono">
                                 {{ parseInt(inspectionData.LMENGEZUB || inspectionData.LOSMENGE) }} 
-                                <span class="text-sm text-slate-400">{{ inspectionData.MENGENEINH }}</span>
+                                <span class="text-sm text-slate-400">{{ inspectionData.MENGENEINH === 'ST' ? 'PC' : inspectionData.MENGENEINH }}</span>
                             </p>
                         </div>
                         <div>
@@ -247,7 +247,7 @@ const submitFinal = () => {
                                 <i class="fa-solid fa-location-dot text-emerald-500"></i> {{ inspectionData.ARBPL || '-' }}
                             </p>
                         </div>
-                         <div>
+                        <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Dispo MRP</label>
                             <p class="text-white font-bold text-lg">{{ inspectionData.DISPO || '-' }}</p>
                         </div>
@@ -455,7 +455,8 @@ const submitFinal = () => {
                             type="text" 
                             v-model="form.nik_qc" 
                             placeholder="NIK Anda"
-                            class="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white font-bold focus:border-emerald-500 focus:bg-black/20 focus:outline-none transition-all"
+                            class="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white font-bold transition-all"
+                            readonly
                         >
                     </div>
                 </div>

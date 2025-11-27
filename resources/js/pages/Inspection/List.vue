@@ -102,16 +102,16 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
         <!-- Navigation Bar -->
         <nav class="relative z-50 shrink-0 w-full bg-[#0f172a]/80 backdrop-blur-xl border-b border-white/5 h-16 flex items-center justify-between px-4 md:px-8">
             <div class="flex items-center gap-3">
-                <div class="h-9 w-9 bg-emerald-500 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center font-black text-black text-lg">K</div>
+                <img src="/images/KMI.png" alt="Logo" class="h-9 w-auto" />
                 <div class="flex flex-col">
                     <h3 class="text-white font-bold text-sm md:text-base leading-none tracking-tight">KMI Inspection</h3>
-                    <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest mt-0.5">Quality Control</span>
+                    <span class="text-emerald-500 text-[0.6rem] font-bold uppercase tracking-widest mt-0.5">Quality Control System</span>
                 </div>
             </div>
             
             <div class="flex items-center gap-3">
                 <div class="hidden flex-col items-end mr-2 md:flex">
-                    <span class="text-[0.65rem] text-slate-400 uppercase font-bold tracking-wider">Operator</span>
+                    <span class="text-[0.65rem] text-slate-400 uppercase font-bold tracking-wider">Halo</span>
                     <span class="text-sm font-bold text-emerald-400 leading-none">{{ props.authUser.username }}</span>
                 </div>
                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-white shadow-inner">
@@ -240,9 +240,9 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 w-12 text-center rounded-tl-2xl border-b border-white/10 shadow-sm">
                                             <input type="checkbox" :checked="isAllSelected" :indeterminate="isIndeterminate" @change="toggleSelectAll" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer">
                                         </th>
-                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Lot & Order</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Inspection Number</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Components</th>
-                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Material Desc</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Material</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Batch</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Qty</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider rounded-tr-2xl border-b border-white/10 shadow-sm">Action</th>
@@ -275,7 +275,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         </td>
                                         <td class="py-4 px-4">
                                             <span class="text-white font-bold">{{ parseInt(lot.LOSMENGE) }}</span> 
-                                            <span class="text-xs text-slate-500 ml-1">{{ lot.MENGENEINH }}</span>
+                                            <span class="text-xs text-slate-500 ml-1">{{ lot.MENGENEINH === 'ST' ? 'PC' : lot.MENGENEINH }}</span>
                                         </td>
                                         <td class="py-4 px-4 text-right">
                                             <!-- FIXED DESKTOP BUTTON -->
@@ -363,12 +363,13 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         <h4 class="text-sm font-bold text-white leading-snug">{{ comp.MAKTX }}</h4>
                                         <div class="text-right shrink-0 ml-2">
                                             <div class="text-sm font-bold text-emerald-400">{{ parseFloat(comp.BDMNG) }}</div>
-                                            <div class="text-[0.6rem] font-bold text-slate-500 uppercase">{{ comp.MEINS }}</div>
+                                            <div class="text-[0.6rem] font-bold text-slate-500 uppercase">{{ comp.MEINS === 'ST' ? 'PC' : comp.MEINS }}</div>
                                         </div>
                                     </div>
                                     <div class="flex flex-wrap items-center gap-2 mt-2">
                                         <span class="px-1.5 py-0.5 rounded bg-black/40 border border-white/5 text-[0.6rem] font-mono text-slate-400">{{ comp.MATNR }}</span>
                                         <span v-if="comp.CHARGX2" class="px-1.5 py-0.5 rounded bg-sky-900/20 border border-sky-500/20 text-[0.6rem] font-mono text-sky-400">Batch: {{ comp.CHARGX2 }}</span>
+                                        <span v-if="comp.DISPO" class="px-1.5 py-0.5 rounded bg-sky-900/20 border border-sky-500/20 text-[0.6rem] font-mono text-sky-400">Batch: {{ comp.DISPO }}</span>
                                         <span v-if="comp.inspector_details" class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[0.6rem] text-indigo-300">
                                             <i class="fa-solid fa-user-clock text-[0.55rem]"></i> {{ comp.inspector_details.nama }}
                                         </span>
