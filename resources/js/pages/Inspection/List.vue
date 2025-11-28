@@ -86,14 +86,17 @@ const bulkPass = async () => {
     progressStats.value = { success: 0, fail: 0, total: selectedLots.value.length };
 
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (!csrfToken) throw new Error("CSRF Token missing.");
+        const xsrfToken = getXsrfToken();
+        if (!xsrfToken) {
+             window.location.reload();
+             return;
+        }
         const response = await fetch('/inspection/bulk-pass', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
+                'X-XSRF-TOKEN': xsrfToken 
             },
             body: JSON.stringify({
                 lots: fullLotsData,
@@ -168,6 +171,15 @@ const closeProgressModal = () => {
         showProgressModal.value = false;
     }
 };
+const getXsrfToken = () => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; XSRF-TOKEN=`);
+    if (parts.length === 2) {
+        return decodeURIComponent(parts.pop().split(';').shift());
+    }
+    return null;
+};
+
 const openComponentModal = async (lot) => {
     selectedLotNumber.value = lot.PRUEFLOS;
     selectedOrderNumber.value = lot.AUFNR;

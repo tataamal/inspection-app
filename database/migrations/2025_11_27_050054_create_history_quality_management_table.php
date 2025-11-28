@@ -21,9 +21,8 @@ return new class extends Migration
             $table->string('batch')->nullable();
             $table->decimal('quantity', 15, 3)->default(0);
             $table->string('uom', 5)->nullable();
-            $table->string('inspector_username'); 
             $table->string('inspector_sap_id')->nullable(); 
-            $table->string('inspector_name')->nullable(); 
+            $table->string('inspector_nik')->nullable(); 
             $table->string('ud_code'); 
             $table->string('ud_selected_set'); 
             $table->string('status'); 

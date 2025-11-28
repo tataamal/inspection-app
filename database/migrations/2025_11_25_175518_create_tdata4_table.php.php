@@ -40,7 +40,7 @@ return new class extends Migration
             $table->string('OUTSREQ')->nullable();
             $table->string('AUFNR2')->nullable();
             $table->string('CHARGX2')->nullable();
-            $table->string('USERISP')->nullable();
+            $table->string('USRISP')->nullable();
             $table->timestamps();
         });
     }
