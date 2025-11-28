@@ -17,6 +17,7 @@ Route::middleware('auth_custom')->group(function () {
     Route::get('/inspection/components/{aufnr}', [InspectionController::class, 'getComponents']);
     Route::get('/inspection/form/{lotNumber}', [InspectionController::class, 'showForm'])->name('inspection.form');
     Route::post('/inspection/submit', [InspectionController::class, 'store'])->name('inspection.submit');
+    Route::get('/inspection/history/export', [DashboardController::class, 'exportHistoryPdf'])->name('inspection.history.export');
     Route::get('/inspection/{dispo}', [InspectionController::class, 'index'])->name('inspection.index');
     Route::post('/inspection/bulk-pass', [InspectionController::class, 'bulkPass'])->name('inspection.bulk_pass');
 });
