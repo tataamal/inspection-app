@@ -40,7 +40,7 @@ class DashboardController extends Controller
         $historyList = [];
         
         // Cek apakah ini user khusus (bisa via config, env, atau hardcode sesuai request)
-        if ($userData['username'] === 'auto_email' && $userData['nik'] === '10000424') {
+        if ($userData['username'] === 'KMI-U124' && $userData['nik'] === '10001069') {
             $historyList = DB::table('history_quality_management')
                             ->where('inspector_nik', $userData['nik'])
                             ->orderBy('created_at', 'desc') // Urutkan dari yang terbaru
@@ -75,7 +75,7 @@ class DashboardController extends Controller
         }
 
         // 2. Security Check: Pastikan hanya user khusus yang bisa cetak
-        if ($userData['username'] !== 'auto_email' || $userData['nik'] !== '10000424') {
+        if ($userData['username'] !== 'KMI-U124' || $userData['nik'] !== '10001069') {
             abort(403, 'Unauthorized action.');
         }
 

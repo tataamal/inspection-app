@@ -16,8 +16,8 @@ const processingMrp = ref(null);
 
 // [MODIFIKASI]: Computed untuk mendeteksi User Khusus
 const isSpecialUser = computed(() => {
-    // return props.authUser?.username === 'KMI-U124' && props.authUser?.nik === '10001069';
-    return props.authUser?.username === 'auto_email' && props.authUser?.nik === '10000424';
+    return props.authUser?.username === 'KMI-U124' && props.authUser?.nik === '10001069';
+    // return props.authUser?.username === 'auto_email' && props.authUser?.nik === '10000424';
 });
 
 const filteredMrp = computed(() => {
