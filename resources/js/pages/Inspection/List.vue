@@ -11,6 +11,7 @@ const props = defineProps({
     authUser: Object,
     errorMessage: String
 });
+
 const searchQuery = ref('');
 const isRefreshing = ref(false);
 const selectedLots = ref([]);
@@ -25,6 +26,83 @@ const isLoadingComponents = ref(false);
 const selectedComponents = ref([]);
 const selectedLotNumber = ref('');
 const selectedOrderNumber = ref('');
+
+// --- 1. CONFIG STATUS (Logic Warna & Action) ---
+const getStatusConfig = (stats) => {
+    if (!stats) return { class: 'bg-slate-500/20 text-slate-400', label: 'N/A', action: 'unknown' };
+    
+    const s = stats.trim();
+
+    // Prioritas Pengecekan String
+    if (s.includes('REL') && s.includes('REL')) {
+        return { class: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20', label: s, action: 'allow' };
+    }
+    if (s.includes('TECO') || (s.includes('UD') && !s.includes('REL'))) { 
+        // Logic: Jika ada TECO, atau ada UD tapi TIDAK ada REL (Pure UD)
+        return { class: 'bg-rose-500/20 text-rose-400 border border-rose-500/20', label: s, action: 'block_teco' };
+    }
+    if (s.includes('REL') && s.includes('UD')) {
+        return { class: 'bg-amber-500/20 text-amber-400 border border-amber-500/20', label: s, action: 'block_rel_ud' };
+    }
+    if (s.includes('CRTD')) {
+        return { class: 'bg-blue-500/20 text-blue-400 border border-blue-500/20', label: s, action: 'block_crtd' };
+    }
+
+    // Default fallback
+    return { class: 'bg-slate-500/20 text-slate-400', label: s, action: 'unknown' };
+};
+
+// --- 2. HANDLER TOMBOL INSPECT (Individual) ---
+const handleInspect = (lot) => {
+    const config = getStatusConfig(lot.STATS);
+    if (config.action === 'allow') {
+        router.visit(`/inspection/form/${lot.PRUEFLOS}?plant=${props.plantCode}&dispo=${props.dispoCode}`);
+    } else {
+        // Tampilkan pesan error sesuai status
+        showStatusAlert(lot.PRUEFLOS, lot.STATS, config.action);
+    }
+};
+
+// --- 3. HELPER ALERT (Supaya tidak duplikat kodingan alert) ---
+const showStatusAlert = (lotNumber, stats, actionType) => {
+    if (actionType === 'block_teco') {
+        Swal.fire({
+            icon: 'error',
+            title: 'Proses Diblokir',
+            html: `Lot <b>${lotNumber}</b> memiliki status <b>${stats}</b> (TECO/UD).<br>Proses sudah selesai atau ditutup.`,
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#ef4444'
+        });
+    } else if (actionType === 'block_rel_ud') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Lot Tidak Valid',
+            html: `Lot <b>${lotNumber}</b> memiliki status <b>${stats}</b>.<br>Inspection Lot ini tidak bisa dikerjakan dari aplikasi Laravel.`,
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#f59e0b'
+        });
+    } else if (actionType === 'block_crtd') {
+        Swal.fire({
+            icon: 'info',
+            title: 'Hubungi Admin',
+            html: `Lot <b>${lotNumber}</b> memiliki status <b>${stats}</b> (CRTD).<br>Silakan hubungi administrator untuk release status lot.`,
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#3b82f6'
+        });
+    } else {
+        Swal.fire({
+            icon: 'question',
+            title: 'Status Tidak Dikenal',
+            text: `Lot ${lotNumber} Status: ${stats}`,
+            background: '#1e293b',
+            color: '#fff'
+        });
+    }
+};
+
 const filteredLots = computed(() => {
     if (!searchQuery.value) return props.initialLots;
     const lowerSearch = searchQuery.value.toLowerCase();
@@ -36,16 +114,20 @@ const filteredLots = computed(() => {
         (lot.AUFNR && lot.AUFNR.toLowerCase().includes(lowerSearch))
     );
 });
+
 const isAllSelected = computed(() => filteredLots.value.length > 0 && selectedLots.value.length === filteredLots.value.length);
 const isIndeterminate = computed(() => selectedLots.value.length > 0 && selectedLots.value.length < filteredLots.value.length);
+
 const refreshData = () => {
     isRefreshing.value = true;
     router.reload({ only: ['initialLots', 'errorMessage'], onFinish: () => { isRefreshing.value = false; } });
 };
+
 const formatDate = (dateStr) => {
     if(!dateStr) return '-';
     return `${dateStr.substring(6,8)}/${dateStr.substring(4,6)}/${dateStr.substring(0,4)}`;
 };
+
 const toggleSelection = (id) => {
     if (selectedLots.value.includes(id)) {
         selectedLots.value = selectedLots.value.filter(lotId => lotId !== id);
@@ -53,10 +135,38 @@ const toggleSelection = (id) => {
         selectedLots.value.push(id);
     }
 };
+
 const toggleSelectAll = () => selectedLots.value = isAllSelected.value ? [] : filteredLots.value.map(lot => lot.PRUEFLOS);
 const clearSelection = () => selectedLots.value = [];
+
+// Helper Cookie Token
+const getXsrfToken = () => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; XSRF-TOKEN=`);
+    if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+    return null;
+};
+
+// --- 4. LOGIKA UTAMA: BULK PASS ---
 const bulkPass = async () => {
     if (selectedLots.value.length === 0) return;
+
+    // A. Ambil Data Lengkap Lot yang dipilih
+    const fullLotsData = props.initialLots.filter(lot => selectedLots.value.includes(lot.PRUEFLOS));
+
+    // B. VALIDASI KETAT SEBELUM POPUP KONFIRMASI
+    // Kita loop satu per satu. Jika ketemu 1 saja yang invalid, batalkan proses.
+    for (const lot of fullLotsData) {
+        const config = getStatusConfig(lot.STATS);
+
+        if (config.action !== 'allow') {
+            // Jika status BUKAN 'allow', panggil alert error dan HENTIKAN eksekusi
+            showStatusAlert(lot.PRUEFLOS, lot.STATS, config.action);
+            return; // <--- INI KUNCINYA: Stop di sini, jangan lanjut ke confirm popup
+        }
+    }
+
+    // C. Jika Lolos Validasi (Semua Hijau), Baru Tampilkan Konfirmasi
     const result = await Swal.fire({
         title: 'Konfirmasi Usage Decision',
         html: `
@@ -78,7 +188,8 @@ const bulkPass = async () => {
     });
 
     if (!result.isConfirmed) return;
-    const fullLotsData = props.initialLots.filter(lot => selectedLots.value.includes(lot.PRUEFLOS));
+
+    // D. Proses Eksekusi ke Server (Streaming)
     isProcessingBulk.value = true;
     isSyncing.value = false;
     showProgressModal.value = true;
@@ -87,24 +198,24 @@ const bulkPass = async () => {
 
     try {
         const xsrfToken = getXsrfToken();
-        if (!xsrfToken) {
-             window.location.reload();
-             return;
-        }
+        if (!xsrfToken) { window.location.reload(); return; }
+
         const response = await fetch('/inspection/bulk-pass', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-XSRF-TOKEN': xsrfToken 
+                'X-XSRF-TOKEN': xsrfToken
             },
             body: JSON.stringify({
                 lots: fullLotsData,
                 plant: props.plantCode
             })
         });
+
         if (response.status === 419) throw new Error("Sesi Kadaluarsa. Silakan refresh halaman.");
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+        
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
@@ -171,14 +282,6 @@ const closeProgressModal = () => {
         showProgressModal.value = false;
     }
 };
-const getXsrfToken = () => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; XSRF-TOKEN=`);
-    if (parts.length === 2) {
-        return decodeURIComponent(parts.pop().split(';').shift());
-    }
-    return null;
-};
 
 const openComponentModal = async (lot) => {
     selectedLotNumber.value = lot.PRUEFLOS;
@@ -201,12 +304,15 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
     <Head title="Inspection List" />
 
     <div class="relative h-[100dvh] w-full bg-[#0B1120] font-sans text-slate-200 flex flex-col overflow-hidden">
+        <!-- Background Effects -->
         <div class="absolute inset-0 z-0 pointer-events-none">
             <div class="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#064e3b] opacity-80"></div>
             <div class="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[80px] animate-pulse"></div>
             <div class="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[60px] animate-pulse delay-1000"></div>
             <div class="absolute inset-0 grid-pattern opacity-20"></div>
         </div>
+
+        <!-- Navbar -->
         <nav class="relative z-50 shrink-0 w-full bg-[#0f172a]/80 backdrop-blur-xl border-b border-white/5 h-16 flex items-center justify-between px-4 md:px-8">
             <div class="flex items-center gap-3">
                 <img src="/images/KMI.png" alt="KMI Logo" class="h-10 w-auto drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]" />
@@ -226,9 +332,10 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
             </div>
         </nav>
+
+        <!-- Header Tools -->
         <div class="relative z-40 shrink-0 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 shadow-xl">
             <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-6">
-                
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex items-center gap-3">
                         <Link href="/dashboard" class="w-8 h-8 rounded-full bg-white/5 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 flex items-center justify-center transition-all">
@@ -269,6 +376,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
             </div>
         </div>
+
         <div class="flex-1 overflow-y-auto relative z-10 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700" id="scrollContainer">
             <div class="max-w-[1400px] mx-auto px-4 py-4 md:px-8 pb-32"> 
 
@@ -280,6 +388,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
 
                 <div v-else>
+                    <!-- Mobile View -->
                     <div class="md:hidden space-y-3 mt-4">
                         <div v-for="(lot, index) in filteredLots" :key="lot.PRUEFLOS" class="relative bg-[#162032] rounded-2xl p-4 border border-white/5 shadow-lg active:scale-[0.99] transition-all duration-200" :class="{'ring-1 ring-emerald-500 bg-emerald-900/10': selectedLots.includes(lot.PRUEFLOS)}">
                             <div class="absolute top-0 right-0 p-4 z-10" @click.stop="toggleSelection(lot.PRUEFLOS)">
@@ -290,8 +399,11 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                             <div class="pr-8 mb-3">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="text-lg font-bold text-white tracking-wide">{{ lot.PRUEFLOS }}</span>
-                                    <span v-if="lot.STATS === 'UD'" class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-indigo-500/20 text-indigo-300">UD</span>
-                                    <span v-else class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-emerald-500/20 text-emerald-400">REL</span>
+                                    
+                                    <!-- Dynamic Badge Color -->
+                                    <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold" :class="getStatusConfig(lot.STATS).class">
+                                        {{ lot.STATS || 'N/A' }}
+                                    </span>
                                 </div>
                                 <div class="text-xs text-slate-400 font-mono">PRO: <span class="text-slate-200">{{ lot.AUFNR }}</span></div>
                             </div>
@@ -310,11 +422,10 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                             </div>
                             <div class="grid grid-cols-[3rem_1fr] gap-2">
                                 <button @click.stop="openComponentModal(lot)" class="h-10 rounded-xl bg-[#1e293b] border border-white/5 flex items-center justify-center text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors"><i class="fa-solid fa-boxes-stacked"></i></button>
-                                <div @click.stop>
-                                    <Link :href="`/inspection/form/${lot.PRUEFLOS}?plant=${props.plantCode}&dispo=${props.dispoCode}`" class="h-10 rounded-xl bg-emerald-600 flex items-center justify-center gap-2 text-white font-bold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:translate-y-0.5 transition-all w-full">
-                                        <span>Inspect</span><i class="fa-solid fa-arrow-right text-xs"></i>
-                                    </Link>
-                                </div>
+                                
+                                <button @click.stop="handleInspect(lot)" class="h-10 rounded-xl bg-emerald-600 flex items-center justify-center gap-2 text-white font-bold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:translate-y-0.5 transition-all w-full hover:bg-emerald-500">
+                                    <span>Inspect</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -329,6 +440,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                             <input type="checkbox" :checked="isAllSelected" :indeterminate="isIndeterminate" @change="toggleSelectAll" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer">
                                         </th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Inspection Number</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Status</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Components</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Material</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Batch</th>
@@ -344,6 +456,11 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         <td class="py-4 px-4">
                                             <div class="font-bold text-white">{{ lot.PRUEFLOS }}</div>
                                             <div class="text-xs text-slate-500 font-mono mt-0.5">{{ lot.AUFNR }}</div>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap" :class="getStatusConfig(lot.STATS).class">
+                                                {{ lot.STATS || '-' }}
+                                            </span>
                                         </td>
                                         <td class="py-4 px-4">
                                             <button @click="openComponentModal(lot)" class="px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white text-xs font-bold transition-all flex items-center gap-2">
@@ -363,9 +480,9 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         </td>
                                         <td class="py-4 px-4 text-right">
                                             <div @click.stop class="inline-block">
-                                                <Link :href="`/inspection/form/${lot.PRUEFLOS}?plant=${props.plantCode}&dispo=${props.dispoCode}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all hover:pr-5 group/btn cursor-pointer">
+                                                <button @click="handleInspect(lot)" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all hover:pr-5 group/btn cursor-pointer">
                                                     <span>Inspect</span> <i class="fa-solid fa-arrow-right opacity-0 group-hover/btn:opacity-100 -translate-x-2 group-hover/btn:translate-x-0 transition-all"></i>
-                                                </Link>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -376,7 +493,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                 </div>
             </div>
         </div>
-
+        
         <!-- Floating Selection Bar -->
         <Transition enter-active-class="transition ease-out duration-300" enter-from-class="translate-y-full opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition ease-in duration-200" leave-from-class="translate-y-0 opacity-100" leave-to-class="translate-y-full opacity-0">
             <div v-if="selectedLots.length > 0" class="absolute bottom-6 left-0 right-0 z-50 flex justify-center px-4">
@@ -397,7 +514,7 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
             </div>
         </Transition>
 
-        <!-- Components Modal -->
+        <!-- Components Modal & Progress Modal (Tidak berubah, hanya styling progress bar tetap dipertahankan) -->
         <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95" enter-to-class="opacity-100 translate-y-0 md:scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 translate-y-0 md:scale-100" leave-to-class="opacity-0 translate-y-full md:translate-y-10 md:scale-95">
             <div v-if="showModal" class="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
                 <div @click="closeModal" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
@@ -454,13 +571,12 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
             </div>
         </Transition>
 
-        <!-- THE FINAL BOSS: PROGRESS TERMINAL MODAL -->
+        <!-- Progress Modal (Sama) -->
         <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
             <div v-if="showProgressModal" class="fixed inset-0 z-[120] flex items-center justify-center px-4">
                 <div class="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
                 
                 <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ring-1 ring-white/10">
-                    
                     <div class="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
                         <div>
                             <h3 class="text-white font-bold text-lg flex items-center gap-2">
@@ -515,7 +631,6 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                         </div>
                     </div>
 
-                    <!-- Footer Actions -->
                     <div class="p-4 border-t border-white/5 bg-white/5 flex justify-between items-center">
                         <div class="text-xs text-slate-500">
                            <span v-if="isProcessingBulk && !isSyncing">
