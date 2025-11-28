@@ -60,11 +60,10 @@ class DashboardController extends Controller
 
     public function exportHistoryPdf(Request $request)
     {
-        // 1. Ambil Session User (Sama seperti index)
+        // 1. Ambil Session User
         $sessionId = $request->session()->getId();
         $redisKey = "sap_session:{$sessionId}";
         
-        // Default fallback
         $userData = ['username' => 'Guest', 'nik' => '0000']; 
 
         if (Redis::exists($redisKey)) {
@@ -74,16 +73,28 @@ class DashboardController extends Controller
             } catch (\Exception $e) { /* Handle error */ }
         }
 
-        // 2. Security Check: Pastikan hanya user khusus yang bisa cetak
+        // 2. Security Check
         if ($userData['username'] !== 'KMI-U124' || $userData['nik'] !== '10001069') {
             abort(403, 'Unauthorized action.');
         }
 
-        // 3. Ambil Data History
+        // 3. [PERBAIKAN LOGIKA] Ambil Data History
+        // Cek tabel mapping untuk mendapatkan NIK yang valid berdasarkan SAP ID yang login
+        $validNiks = DB::table('mapping_user_plant')
+                        ->where('sap_id', $userData['username']) // Filter berdasarkan SAP ID (misal: KMI-U124)
+                        ->pluck('nik') // Ambil semua NIK yang terhubung (jika ada lebih dari 1)
+                        ->toArray();
+
+        // Jika tidak ada mapping ditemukan, fallback ke NIK dari session (opsional, atau kosongkan)
+        if (empty($validNiks)) {
+            $validNiks = [$userData['nik']];
+        }
+
+        // Query history menggunakan NIK yang valid dari mapping
         $historyData = DB::table('history_quality_management')
-                        ->where('inspector_nik', $userData['nik'])
+                        ->whereIn('inspector_nik', $validNiks) // Gunakan whereIn untuk safety
                         ->orderBy('created_at', 'desc')
-                        ->limit(200) // Batasi 200 record terakhir untuk performa PDF
+                        ->limit(200)
                         ->get();
 
         // 4. Generate PDF
@@ -91,13 +102,11 @@ class DashboardController extends Controller
             'data' => $historyData,
             'user' => $userData,
             'generated_at' => Carbon::now()->format('d F Y, H:i:s'),
-            'logo_path' => public_path('images/KMI.png') // Pastikan file ini ada
+            'logo_path' => public_path('images/KMI.png')
         ]);
 
-        // Set kertas A4 Landscape agar tabel muat lega
         $pdf->setPaper('a4', 'landscape');
 
-        // 5. Stream (Tampilkan di browser) atau Download
         return $pdf->stream('Laporan_History_QM_' . Carbon::now()->format('Ymd_His') . '.pdf');
     }
 }
