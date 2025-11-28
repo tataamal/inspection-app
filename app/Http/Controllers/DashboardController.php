@@ -41,8 +41,21 @@ class DashboardController extends Controller
         
         // Cek apakah ini user khusus (bisa via config, env, atau hardcode sesuai request)
         if ($userData['username'] === 'KMI-U124' && $userData['nik'] === '10001069') {
+            
+            // [LOGIC FIX]: Samakan logika dengan exportHistoryPdf
+            // Ambil NIK valid dari tabel mapping berdasarkan SAP ID
+            $validNiks = DB::table('mapping_user_plant')
+                            ->where('sap_id', $userData['username'])
+                            ->pluck('nik')
+                            ->toArray();
+
+            // Fallback jika tidak ada mapping
+            if (empty($validNiks)) {
+                $validNiks = [$userData['nik']];
+            }
+
             $historyList = DB::table('history_quality_management')
-                            ->where('inspector_nik', $userData['nik'])
+                            ->whereIn('inspector_nik', $validNiks) // Gunakan whereIn
                             ->orderBy('created_at', 'desc') // Urutkan dari yang terbaru
                             ->limit(100) // Batasi agar tidak terlalu berat
                             ->get();
