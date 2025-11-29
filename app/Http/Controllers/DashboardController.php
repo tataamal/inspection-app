@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use App\Models\MappingUserPlant;
@@ -30,34 +31,30 @@ class DashboardController extends Controller
                 // Handle error decrypt
             }
         }
-
-        // 1. Ambil MRP List (Logic Lama)
         $myMrpList = MappingUserPlant::where('nik', $userData['nik'])
                         ->select('id', 'plant', 'mrp as code', 'nama_karyawan as name') 
                         ->get();
-
-        // 2. [TAMBAHAN] Ambil History List jika user adalah target khusus
         $historyList = [];
-        
-        // Cek apakah ini user khusus (bisa via config, env, atau hardcode sesuai request)
         if ($userData['username'] === 'KMI-U124' && $userData['nik'] === '10001069') {
-            
-            // [LOGIC FIX]: Samakan logika dengan exportHistoryPdf
-            // Ambil NIK valid dari tabel mapping berdasarkan SAP ID
             $validNiks = DB::table('mapping_user_plant')
                             ->where('sap_id', $userData['username'])
                             ->pluck('nik')
                             ->toArray();
-
-            // Fallback jika tidak ada mapping
             if (empty($validNiks)) {
                 $validNiks = [$userData['nik']];
             }
 
             $historyList = DB::table('history_quality_management')
-                            ->whereIn('inspector_nik', $validNiks) // Gunakan whereIn
-                            ->orderBy('created_at', 'desc') // Urutkan dari yang terbaru
-                            ->limit(100) // Batasi agar tidak terlalu berat
+                            ->whereIn('inspector_nik', $validNiks)
+                            ->orderBy('created_at', 'desc')
+                            ->limit(100)
+                            ->get();
+
+        } else {
+            $historyList = DB::table('history_quality_management')
+                            ->where('inspector_nik', $userData['nik'])
+                            ->orderBy('created_at', 'desc')
+                            ->limit(50) // Batasi 50 terakhir
                             ->get();
         }
 
@@ -67,16 +64,14 @@ class DashboardController extends Controller
                 'nik'      => $userData['nik']
             ],
             'mrpList' => $myMrpList,
-            'historyList' => $historyList // [PENTING] Kirim data ke Vue props
+            'historyList' => $historyList
         ]);
     }
 
     public function exportHistoryPdf(Request $request)
     {
-        // 1. Ambil Session User
         $sessionId = $request->session()->getId();
         $redisKey = "sap_session:{$sessionId}";
-        
         $userData = ['username' => 'Guest', 'nik' => '0000']; 
 
         if (Redis::exists($redisKey)) {
@@ -85,37 +80,47 @@ class DashboardController extends Controller
                 $userData = json_decode($decrypted, true);
             } catch (\Exception $e) { /* Handle error */ }
         }
-
-        // 2. Security Check
         if ($userData['username'] !== 'KMI-U124' || $userData['nik'] !== '10001069') {
             abort(403, 'Unauthorized action.');
         }
-
-        // 3. [PERBAIKAN LOGIKA] Ambil Data History
-        // Cek tabel mapping untuk mendapatkan NIK yang valid berdasarkan SAP ID yang login
         $validNiks = DB::table('mapping_user_plant')
-                        ->where('sap_id', $userData['username']) // Filter berdasarkan SAP ID (misal: KMI-U124)
-                        ->pluck('nik') // Ambil semua NIK yang terhubung (jika ada lebih dari 1)
+                        ->where('sap_id', $userData['username'])
+                        ->pluck('nik')
                         ->toArray();
 
-        // Jika tidak ada mapping ditemukan, fallback ke NIK dari session (opsional, atau kosongkan)
         if (empty($validNiks)) {
             $validNiks = [$userData['nik']];
         }
+        $query = DB::table('history_quality_management')
+                    ->whereIn('inspector_nik', $validNiks);
+        if ($request->has('start_date') && $request->start_date) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+        if ($request->has('end_date') && $request->end_date) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
 
-        // Query history menggunakan NIK yang valid dari mapping
-        $historyData = DB::table('history_quality_management')
-                        ->whereIn('inspector_nik', $validNiks) // Gunakan whereIn untuk safety
-                        ->orderBy('created_at', 'desc')
-                        ->limit(200)
-                        ->get();
+        $historyData = $query->orderBy('created_at', 'desc')->get();
+        $hiddenColumns = [];
+        $columnsToCheck = ['date', 'lot', 'material', 'so', 'buyer', 'order', 'qty', 'ud', 'status'];
+        
+        foreach ($columnsToCheck as $col) {
+            if ($request->has("hide_{$col}")) {
+                $hiddenColumns[$col] = true;
+            }
+        }
 
-        // 4. Generate PDF
+        // 6. Generate PDF
         $pdf = Pdf::loadView('reports.history_qm_pdf', [
             'data' => $historyData,
             'user' => $userData,
             'generated_at' => Carbon::now()->format('d F Y, H:i:s'),
-            'logo_path' => public_path('images/KMI.png')
+            'logo_path' => public_path('images/KMI.png'),
+            'filters' => [
+                'start' => $request->start_date,
+                'end' => $request->end_date
+            ],
+            'hidden_columns' => $hiddenColumns 
         ]);
 
         $pdf->setPaper('a4', 'landscape');

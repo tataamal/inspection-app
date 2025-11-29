@@ -16,7 +16,6 @@ class InspectionController extends Controller
 {
     public function index(Request $request, $dispo)
     {   
-        // Pastikan plant diambil dari query string, default ke 3000 jika kosong
         $plant = $request->query('plant', '3000'); 
         $sessionId = $request->session()->getId();
         $redisKey = "sap_session:{$sessionId}";
@@ -42,12 +41,7 @@ class InspectionController extends Controller
 
                 if ($response->successful()) {
                     $jsonResponse = $response->json();
-
-                    // [PERBAIKAN DISINI] 
-                    // mengambil key 'data' karena Node.js sekarang mengirim { data: [...], ... }
                     $inspectionLots = $jsonResponse['data'] ?? [];
-
-                    // fallback: format lama
                     if (empty($inspectionLots)) {
                         $inspectionLots = $jsonResponse['data_insp_lot'] ?? [];
                     }
@@ -113,7 +107,7 @@ class InspectionController extends Controller
         $targetLot = null;
 
         try {
-            $response = Http::timeout(30)->get("{$sapBaseUrl}/api/get_insp_lot", [
+            $response = Http::timeout(60)->get("{$sapBaseUrl}/api/get_insp_lot", [
                 'plant'    => $plant,
                 'username' => $userData['username'],
                 'password' => $password,
@@ -121,12 +115,7 @@ class InspectionController extends Controller
             ]);
 
             if ($response->successful()) {
-                // Perhatikan: Node.js Anda sekarang mengembalikan 'data', bukan 'data_insp_lot'
-                // Pastikan Node.js sudah direstart setelah perubahan terakhir.
                 $allLots = $response->json()['data'] ?? []; 
-                
-                // --- PERBAIKAN PENCARIAN (FIX LEADING ZERO) ---
-                // Kita bandingkan sebagai Integer agar "0400..." sama dengan "400..."
                 $targetLot = collect($allLots)->first(function ($lot) use ($lotNumber) {
                     return (int)$lot['PRUEFLOS'] === (int)$lotNumber;
                 });
@@ -134,10 +123,6 @@ class InspectionController extends Controller
         } catch (\Exception $e) {
             // Silent error
         }
-
-        // --- PERBAIKAN FALLBACK (JANGAN REDIRECT) ---
-        // Jika data tidak ketemu (misal karena beda format atau API gagal),
-        // Kita buat data manual agar Form tetap terbuka.
         if (!$targetLot) {
             $targetLot = [
                 'PRUEFLOS'   => $lotNumber, // Gunakan nomor dari URL
@@ -152,8 +137,6 @@ class InspectionController extends Controller
                 'ENSTEHDAT'  => now()->format('Ymd')
             ];
         }
-
-        // Return Inertia (Apapun kondisinya, halaman harus terbuka)
         return Inertia::render('Inspection/Form', [
             'lotNumber' => $lotNumber,
             'authUser'  => $userData,
@@ -302,6 +285,10 @@ class InspectionController extends Controller
                         'batch'              => $lot->CHARG ?? null,
                         'quantity'           => $lot->LOSMENGE ?? 0,
                         'uom'                => $lot->MENGENEINH ?? null,
+                        'sales_order'        => $lot->KDAUF ?? null,
+                        'sales_item'         => isset($lot->KDPOS) ? ltrim($lot->KDPOS, '0') : null, 
+                        'buyer_name'         => $lot->NAME1 ?? null,
+                        'customer_po'        => $lot->BSTNK ?? null,
                         'inspector_sap_id'   => $sapUsername, 
                         'inspector_nik'      => $sapNik,                  
                         'ud_code'            => $udConfig['ud_code'],

@@ -8,7 +8,7 @@ const props = defineProps({
     plantCode: String,
     dispoCode: String,
     authUser: Object,
-    lotData: Object
+    lotData: Object // Pastikan controller mengirim data lengkap termasuk KDAUF, KDPOS, NAME1, BSTNK
 });
 
 const inspectionData = ref({});
@@ -36,6 +36,12 @@ const inspectionItems = [
     "Operator Error", "Machine Malfunction", "Tool Wear", "Setup Machine"
 ];
 
+// --- HELPER BARU: Format Item Number ---
+const removeLeadingZeros = (str) => {
+    if (!str) return '';
+    return parseInt(str, 10).toString();
+};
+
 const toggleDefect = (item) => {
     if (form.defects.includes(item)) {
         form.defects = form.defects.filter(i => i !== item);
@@ -53,8 +59,8 @@ const cameraViews = [
 ];
 
 const cameraActive = reactive({ front: false, back: false, top: false, bottom: false });
-const videoRefs = ref({}); // Menyimpan referensi elemen video
-const activeStreams = {};  // Menyimpan stream media
+const videoRefs = ref({}); 
+const activeStreams = {}; 
 
 const selectAllDefects = () => {
     form.defects = [...inspectionItems]; 
@@ -70,7 +76,7 @@ const startCamera = async (slug) => {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         activeStreams[slug] = stream;
         
-        await nextTick(); // Tunggu DOM update agar ref video tersedia
+        await nextTick();
         if (videoRefs.value[slug]) {
             videoRefs.value[slug].srcObject = stream;
         }
@@ -87,8 +93,6 @@ const captureImage = (slug) => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
-        
-        // Simpan ke form data
         form.images[slug] = canvas.toDataURL('image/jpeg', 0.8);
         stopCamera(slug);
     }
@@ -108,12 +112,10 @@ const retakeImage = (slug) => {
 };
 
 onMounted(() => {
-    // Cek apakah data dikirim dari Controller
     if (props.lotData) {
-        inspectionData.value = props.lotData; // Load data dari Props
+        inspectionData.value = props.lotData;
         isValidSession.value = true;
     } else {
-        // Fallback jika controller gagal kirim data
         isValidSession.value = false;
         Swal.fire({
             icon: 'error',
@@ -133,7 +135,6 @@ onBeforeUnmount(() => {
 
 const goBack = () => {
     if (props.dispoCode) {
-        // Gunakan router.get standard
         router.get(`/inspection/${props.dispoCode}`, { plant: props.plantCode });
     } else {
         router.get('/dashboard');
@@ -157,7 +158,6 @@ const openSubmitModal = () => {
 };
 
 const submitFinal = () => {
-    // Simulasi Submit ke Backend
     form.post('/inspection/submit', {
         onSuccess: () => {
             showModal.value = false;
@@ -165,7 +165,6 @@ const submitFinal = () => {
                 .then(() => goBack());
         },
         onError: () => {
-            // Handle error
             showModal.value = false;
         }
     });
@@ -215,6 +214,7 @@ const submitFinal = () => {
 
             <form @submit.prevent="openSubmitModal" class="space-y-6">
 
+                <!-- HEADER INFO: Lot, Material, SO, PO -->
                 <div class="relative bg-slate-800/60 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shadow-xl">
                     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-sky-500"></div>
                     
@@ -224,33 +224,62 @@ const submitFinal = () => {
                             <span class="text-3xl font-black text-white font-mono tracking-wide">{{ inspectionData.PRUEFLOS }}</span>
                         </div>
                         <div class="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono font-bold text-lg">
-                            {{ inspectionData.CHARG }}
+                            <i class="fa-solid fa-box mr-2 text-sm"></i>{{ inspectionData.CHARG }}
                         </div>
                     </div>
 
-                    <div class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        <div class="col-span-1 md:col-span-2 lg:col-span-1">
+                    <!-- Layout Grid Diperbarui untuk mengakomodasi SO & PO -->
+                    <div class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+                        
+                        <!-- Col 1: Material (Lebar) -->
+                        <div class="md:col-span-3 lg:col-span-1">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Material</label>
                             <p class="text-white font-bold text-lg leading-tight">{{ inspectionData.KTEXTMAT }}</p>
                             <span class="text-sm text-slate-400 font-mono mt-1 block">{{ inspectionData.MATNR }}</span>
                         </div>
+
+                        <!-- Col 2: Qty & Lokasi -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Quantity</label>
-                            <p class="text-white font-bold text-xl font-mono">
-                                {{ parseInt(inspectionData.LMENGEZUB || inspectionData.LOSMENGE) }} 
-                                <span class="text-sm text-slate-400">{{ inspectionData.MENGENEINH === 'ST' ? 'PC' : inspectionData.MENGENEINH }}</span>
-                            </p>
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Quantity</label>
+                                <p class="text-white font-bold text-xl font-mono">
+                                    {{ parseInt(inspectionData.LMENGEZUB || inspectionData.LOSMENGE) }} 
+                                    <span class="text-sm text-slate-400">{{ inspectionData.MENGENEINH === 'ST' ? 'PC' : inspectionData.MENGENEINH }}</span>
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lokasi & Dispo</label>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-white font-bold text-lg flex items-center gap-1">
+                                        <i class="fa-solid fa-location-dot text-emerald-500 text-sm"></i> {{ inspectionData.ARBPL || '-' }}
+                                    </span>
+                                    <span class="bg-white/10 px-2 py-0.5 rounded text-xs font-mono text-slate-300">{{ inspectionData.DISPO || '-' }}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lokasi</label>
-                            <p class="text-white font-bold text-lg flex items-center gap-2">
-                                <i class="fa-solid fa-location-dot text-emerald-500"></i> {{ inspectionData.ARBPL || '-' }}
-                            </p>
+
+                        <!-- Col 3: SO & Buyer (TAMBAHAN BARU) -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sales Order / Item</label>
+                                <div class="text-indigo-300 font-bold text-lg font-mono leading-none">
+                                    {{ inspectionData.KDAUF || '-' }}
+                                    <span v-if="inspectionData.KDPOS" class="text-sm text-slate-500">
+                                        / {{ removeLeadingZeros(inspectionData.KDPOS) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Buyer / PO</label>
+                                <div class="text-white font-bold text-sm truncate" :title="inspectionData.NAME1">
+                                    {{ inspectionData.NAME1 || '-' }}
+                                </div>
+                                <div class="text-emerald-400 text-xs font-mono mt-1 flex items-center gap-2">
+                                    <i class="fa-solid fa-file-invoice"></i> {{ inspectionData.BSTNK || '-' }}
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Dispo MRP</label>
-                            <p class="text-white font-bold text-lg">{{ inspectionData.DISPO || '-' }}</p>
-                        </div>
+
                     </div>
                 </div>
 

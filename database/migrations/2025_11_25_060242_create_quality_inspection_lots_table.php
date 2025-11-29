@@ -12,20 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('quality_inspection_lots', function (Blueprint $table) {
-            // Primary Key (String, bukan Auto Increment ID)
             $table->string('PRUEFLOS', 20)->primary();
-
-            // String Fields (VARCHAR)
-            // Saya tambahkan ->nullable() agar aman jika datanya kosong
             $table->string('WERK', 10)->nullable()->index(); // Langsung index di sini juga bisa
             $table->string('ART', 10)->nullable();
             $table->string('HERKUNFT', 10)->nullable();
             $table->string('OBJNR', 30)->nullable();
-            
-            // Date & Time
             $table->date('ENSTEHDAT')->nullable();
-            $table->string('ENTSTEZEIT', 10)->nullable(); // Disimpan sebagai string sesuai request lama
-            
+            $table->string('ENTSTEZEIT', 10)->nullable();
             $table->string('AUFNR', 20)->nullable();
             $table->string('DISPO', 10)->nullable()->index();
             $table->string('ARBPL', 20)->nullable();
@@ -46,9 +39,7 @@ return new class extends Migration
             $table->string('MJAHR', 10)->nullable();
             $table->string('MBLNR', 20)->nullable();
             $table->string('ZEILE', 10)->nullable();
-            
             $table->date('BUDAT')->nullable();
-            
             $table->string('BWART', 10)->nullable();
             $table->string('WERKVORG', 10)->nullable();
             $table->string('LAGORTVORG', 10)->nullable();
@@ -61,23 +52,20 @@ return new class extends Migration
             $table->string('LS_KDMAT', 40)->nullable();
             $table->string('SPRACHE', 5)->nullable();
             $table->string('KTEXTMAT', 255)->nullable();
-            
-            // Decimals (DECIMAL 15,3)
             $table->decimal('LOSMENGE', 15, 3)->nullable();
             $table->string('MENGENEINH', 5)->nullable();
             $table->decimal('LMENGE01', 15, 3)->nullable();
             $table->decimal('LMENGE04', 15, 3)->nullable();
             $table->decimal('LMENGE07', 15, 3)->nullable();
             $table->decimal('LMENGEZUB', 15, 3)->nullable();
-            
             $table->string('STAT34', 10)->nullable();
             $table->string('STAT35', 10)->nullable();
             $table->string('KTEXTLOS', 255)->nullable();
             $table->string('INSP_DOC_NUMBER', 30)->nullable();
             $table->string('AUFPL', 20)->nullable();
             $table->string('STATS', 20)->nullable();
-
-            // Timestamps (created_at, updated_at)
+            $table->string('NAME1', 255)->nullable();
+            $table->string('BSTNK', 255)->nullable();
             $table->timestamps();
         });
     }

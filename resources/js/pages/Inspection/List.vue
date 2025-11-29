@@ -128,6 +128,11 @@ const formatDate = (dateStr) => {
     return `${dateStr.substring(6,8)}/${dateStr.substring(4,6)}/${dateStr.substring(0,4)}`;
 };
 
+const removeLeadingZeros = (str) => {
+    if (!str) return '';
+    return parseInt(str, 10).toString();
+};
+
 const toggleSelection = (id) => {
     if (selectedLots.value.includes(id)) {
         selectedLots.value = selectedLots.value.filter(lotId => lotId !== id);
@@ -396,36 +401,56 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                     <i class="fa-solid fa-check text-xs"></i>
                                 </div>
                             </div>
+
                             <div class="pr-8 mb-3">
-                                <div class="flex items-center gap-2 mb-1">
+                                <div class="flex items-center gap-2 mb-2">
                                     <span class="text-lg font-bold text-white tracking-wide">{{ lot.PRUEFLOS }}</span>
-                                    
-                                    <!-- Dynamic Badge Color -->
                                     <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold" :class="getStatusConfig(lot.STATS).class">
                                         {{ lot.STATS || 'N/A' }}
                                     </span>
                                 </div>
-                                <div class="text-xs text-slate-400 font-mono">PRO: <span class="text-slate-200">{{ lot.AUFNR }}</span></div>
-                            </div>
-                            <div class="mb-4">
-                                <p class="text-sm font-semibold text-slate-100 line-clamp-2 leading-snug">{{ lot.KTEXTMAT }}</p>
-                                <div class="mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                    <span class="px-2 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 whitespace-nowrap font-mono">{{ lot.MATNR }}</span>
-                                    <span class="px-2 py-1 rounded-md bg-sky-500/10 border border-sky-500/10 text-[0.65rem] text-sky-400 whitespace-nowrap font-mono flex items-center gap-1">
-                                        <i class="fa-solid fa-box text-[0.6rem]"></i> {{ lot.CHARG }}
-                                    </span>
+
+                                <div class="bg-black/20 rounded-lg p-2.5 mb-3 border border-white/5 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div class="text-[0.6rem] text-slate-500 uppercase font-bold tracking-wider">Sales Order</div>
+                                        <div class="text-sm font-mono text-indigo-300 font-bold">
+                                            {{ lot.KDAUF || '-' }} 
+                                            <span v-if="lot.KDPOS" class="text-slate-400 text-xs font-normal">/ {{ removeLeadingZeros(lot.KDPOS) }}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[0.6rem] text-slate-500 uppercase font-bold tracking-wider">Production Ord</div>
+                                        <div class="text-sm font-mono text-slate-300">{{ lot.AUFNR }}</div>
+                                    </div>
+                                    <div class="col-span-2 border-t border-white/5 pt-2">
+                                        <div class="text-[0.6rem] text-slate-500 uppercase font-bold tracking-wider">Buyer / PO</div>
+                                        <div class="text-sm font-bold text-white truncate">{{ lot.NAME1 || '-' }}</div>
+                                        <div class="text-xs font-mono text-emerald-400 mt-0.5 flex items-center gap-1">
+                                            <i class="fa-solid fa-file-invoice text-[0.6rem]"></i> {{ lot.BSTNK || '-' }}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
-                                    <div class="flex items-center gap-1"><i class="fa-regular fa-calendar"></i> {{ formatDate(lot.ENSTEHDAT) }}</div>
-                                    <div class="font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-white/5">{{ parseInt(lot.LOSMENGE) }} <span class="text-[0.6rem] font-normal text-slate-500">{{ lot.MENGENEINH === 'ST' ? 'PC' : lot.MENGENEINH }}</span></div>
+
+                                <div class="mb-4">
+                                    <p class="text-sm font-semibold text-slate-100 line-clamp-2 leading-snug">{{ lot.KTEXTMAT }}</p>
+                                    <div class="mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                        <span class="px-2 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 whitespace-nowrap font-mono">{{ lot.MATNR }}</span>
+                                        <span class="px-2 py-1 rounded-md bg-sky-500/10 border border-sky-500/10 text-[0.65rem] text-sky-400 whitespace-nowrap font-mono flex items-center gap-1">
+                                            <i class="fa-solid fa-box text-[0.6rem]"></i> {{ lot.CHARG }}
+                                        </span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+                                        <div class="flex items-center gap-1"><i class="fa-regular fa-calendar"></i> {{ formatDate(lot.ENSTEHDAT) }}</div>
+                                        <div class="font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-white/5">{{ parseInt(lot.LOSMENGE) }} <span class="text-[0.6rem] font-normal text-slate-500">{{ lot.MENGENEINH === 'ST' ? 'PC' : lot.MENGENEINH }}</span></div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="grid grid-cols-[3rem_1fr] gap-2">
-                                <button @click.stop="openComponentModal(lot)" class="h-10 rounded-xl bg-[#1e293b] border border-white/5 flex items-center justify-center text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors"><i class="fa-solid fa-boxes-stacked"></i></button>
-                                
-                                <button @click.stop="handleInspect(lot)" class="h-10 rounded-xl bg-emerald-600 flex items-center justify-center gap-2 text-white font-bold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:translate-y-0.5 transition-all w-full hover:bg-emerald-500">
-                                    <span>Inspect</span><i class="fa-solid fa-arrow-right text-xs"></i>
-                                </button>
+
+                                <div class="grid grid-cols-[3rem_1fr] gap-2">
+                                    <button @click.stop="openComponentModal(lot)" class="h-10 rounded-xl bg-[#1e293b] border border-white/5 flex items-center justify-center text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors"><i class="fa-solid fa-boxes-stacked"></i></button>
+                                    <button @click.stop="handleInspect(lot)" class="h-10 rounded-xl bg-emerald-600 flex items-center justify-center gap-2 text-white font-bold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:translate-y-0.5 transition-all w-full hover:bg-emerald-500">
+                                        <span>Inspect</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -441,6 +466,8 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         </th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Inspection Number</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Status</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">SO / Item</th>
+                                        <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Buyer / PO</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Components</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Material</th>
                                         <th class="sticky top-0 z-40 bg-[#0f172a] py-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10 shadow-sm">Batch</th>
@@ -455,13 +482,28 @@ const closeModal = () => { showModal.value = false; setTimeout(() => selectedCom
                                         </td>
                                         <td class="py-4 px-4">
                                             <div class="font-bold text-white">{{ lot.PRUEFLOS }}</div>
-                                            <div class="text-xs text-slate-500 font-mono mt-0.5">{{ lot.AUFNR }}</div>
+                                            <div class="text-xs text-slate-500 font-mono mt-0.5" title="Production Order">{{ lot.AUFNR }}</div>
                                         </td>
                                         <td class="py-4 px-4">
                                             <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap" :class="getStatusConfig(lot.STATS).class">
                                                 {{ lot.STATS || '-' }}
                                             </span>
                                         </td>
+
+                                        <td class="py-4 px-4 whitespace-nowrap">
+                                            <div class="font-mono text-indigo-300 font-bold text-sm">{{ lot.KDAUF || '-' }}</div>
+                                            <div v-if="lot.KDPOS" class="text-xs text-slate-500 mt-0.5">
+                                                Item: <span class="text-slate-300 font-mono">{{ removeLeadingZeros(lot.KDPOS) }}</span>
+                                            </div>
+                                        </td>
+
+                                        <td class="py-4 px-4 max-w-[180px]">
+                                            <div class="text-white font-bold truncate text-xs" :title="lot.NAME1">{{ lot.NAME1 || '-' }}</div>
+                                            <div class="text-[0.65rem] text-emerald-400 font-mono mt-0.5 truncate flex items-center gap-1" :title="lot.BSTNK">
+                                                <i class="fa-solid fa-file-invoice opacity-50"></i> {{ lot.BSTNK || '-' }}
+                                            </div>
+                                        </td>
+
                                         <td class="py-4 px-4">
                                             <button @click="openComponentModal(lot)" class="px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white text-xs font-bold transition-all flex items-center gap-2">
                                                 <i class="fa-solid fa-boxes-stacked"></i> View
