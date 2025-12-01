@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, reactive, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, onUnmounted, reactive, nextTick } from 'vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import Swal from 'sweetalert2';
 
@@ -8,12 +8,16 @@ const props = defineProps({
     plantCode: String,
     dispoCode: String,
     authUser: Object,
-    lotData: Object // Pastikan controller mengirim data lengkap termasuk KDAUF, KDPOS, NAME1, BSTNK
+    lotData: Object 
 });
 
 const inspectionData = ref({});
 const isValidSession = ref(false);
 const currentDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+// --- MINIMALIST LOADER STATE ---
+const isPageLoading = ref(false);
+const loadingMessage = ref('');
 
 const form = useForm({
     nik_qc: props.authUser.nik || '',
@@ -111,7 +115,9 @@ const retakeImage = (slug) => {
     startCamera(slug);
 };
 
+// --- LIFECYCLE & FAST LOADER LOGIC ---
 onMounted(() => {
+    // 1. Existing Validation Logic
     if (props.lotData) {
         inspectionData.value = props.lotData;
         isValidSession.value = true;
@@ -127,6 +133,32 @@ onMounted(() => {
             allowOutsideClick: false
         }).then(() => goBack());
     }
+
+    // 2. ULTRA FAST LOADER IMPLEMENTATION
+    let startTimer = null;
+
+    const removeStartListener = router.on('start', () => {
+        // Tunda 200ms. Jika pindah halaman < 200ms, loader TIDAK AKAN MUNCUL (terasa native).
+        // Jika lebih, baru munculkan indikator minimalis.
+        startTimer = setTimeout(() => {
+            isPageLoading.value = true;
+            loadingMessage.value = 'Loading...'; 
+        }, 200);
+    });
+
+    const removeFinishListener = router.on('finish', () => {
+        // Batalkan timer start jika data sudah sampai
+        if (startTimer) clearTimeout(startTimer);
+        
+        // Matikan loader SEGERA tanpa delay
+        isPageLoading.value = false;
+    });
+
+    onUnmounted(() => {
+        removeStartListener();
+        removeFinishListener();
+        if (startTimer) clearTimeout(startTimer);
+    });
 });
 
 onBeforeUnmount(() => {
@@ -134,6 +166,7 @@ onBeforeUnmount(() => {
 });
 
 const goBack = () => {
+    loadingMessage.value = 'Kembali...';
     if (props.dispoCode) {
         router.get(`/inspection/${props.dispoCode}`, { plant: props.plantCode });
     } else {
@@ -158,6 +191,8 @@ const openSubmitModal = () => {
 };
 
 const submitFinal = () => {
+    loadingMessage.value = 'Menyimpan...';
+    
     form.post('/inspection/submit', {
         onSuccess: () => {
             showModal.value = false;
@@ -166,6 +201,7 @@ const submitFinal = () => {
         },
         onError: () => {
             showModal.value = false;
+            isPageLoading.value = false; 
         }
     });
 };
@@ -176,11 +212,13 @@ const submitFinal = () => {
 
     <div class="relative min-h-screen bg-slate-900 font-sans text-slate-200 overflow-x-hidden selection:bg-emerald-500 selection:text-white pb-32">
         
+        <!-- Background Effects -->
         <div class="fixed inset-0 z-0 pointer-events-none">
             <div class="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0a3d2e]"></div>
             <div class="absolute inset-0 grid-pattern"></div>
         </div>
 
+        <!-- Navbar -->
         <nav class="sticky top-0 z-50 w-full bg-[#0f172a]/95 backdrop-blur-xl border-b border-white/10 shadow-lg">
             <div class="max-w-[1400px] mx-auto px-6 py-3 flex justify-between items-center">
                 <div class="flex items-center gap-3">
@@ -201,6 +239,7 @@ const submitFinal = () => {
 
         <main v-if="isValidSession" class="relative z-10 max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8">
             
+            <!-- Top Controls -->
             <div class="flex justify-between items-center mb-8">
                 <button @click="goBack" class="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 hover:text-white transition-all">
                     <i class="fa-solid fa-arrow-left group-hover:-translate-x-1 transition-transform"></i>
@@ -283,6 +322,7 @@ const submitFinal = () => {
                     </div>
                 </div>
 
+                <!-- Inspection Visual Points -->
                 <div class="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-6 md:p-8">
                     
                     <div class="flex flex-wrap justify-between items-end mb-6 pb-4 border-b border-white/5 gap-4">
@@ -337,6 +377,7 @@ const submitFinal = () => {
 
                 </div>
 
+                <!-- Camera Documentation -->
                 <div class="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-6 md:p-8">
                     <div class="flex items-center gap-3 mb-6 pb-4 border-b border-white/5">
                         <i class="fa-solid fa-camera text-emerald-500 text-xl"></i>
@@ -403,6 +444,7 @@ const submitFinal = () => {
                     </div>
                 </div>
 
+                <!-- Notes & AQL -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
                     <div class="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-6 md:p-8 flex flex-col h-full">
@@ -468,11 +510,13 @@ const submitFinal = () => {
             </form>
         </main>
 
+        <!-- Initial Load State (Only for first paint) -->
         <div v-else class="h-screen flex flex-col items-center justify-center text-slate-500">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
             <p>Memvalidasi Data...</p>
         </div>
 
+        <!-- Sticky Bottom Bar -->
         <div v-if="isValidSession" class="fixed bottom-0 left-0 w-full bg-[#0f172a]/90 backdrop-blur-xl border-t border-white/10 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             <div class="max-w-[1400px] mx-auto px-4 md:px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
                 
@@ -503,6 +547,7 @@ const submitFinal = () => {
             </div>
         </div>
 
+        <!-- CONFIRMATION MODAL -->
         <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" @click="showModal = false"></div>
             
@@ -562,6 +607,28 @@ const submitFinal = () => {
             </div>
         </div>
 
+        <!-- NEW MINIMALIST LOADER (Top Bar Style) -->
+        <!-- 1. Top Progress Bar (Visual Cepat & Ringan) -->
+        <div v-if="isPageLoading" class="fixed top-0 left-0 w-full h-1 z-[9999] overflow-hidden">
+            <div class="h-full bg-emerald-400 animate-progress-indeterminate shadow-[0_0_10px_#34d399]"></div>
+        </div>
+
+        <!-- 2. Minimalist Status Pill (Pojok Kanan Bawah) -->
+        <!-- Hanya muncul jika loading > 200ms, supaya user tau sistem bekerja -->
+        <Transition 
+            enter-active-class="transition duration-300 ease-out" 
+            enter-from-class="opacity-0 translate-y-4" 
+            enter-to-class="opacity-100 translate-y-0" 
+            leave-active-class="transition duration-200 ease-in" 
+            leave-from-class="opacity-100 translate-y-0" 
+            leave-to-class="opacity-0 translate-y-4"
+        >
+            <div v-if="isPageLoading" class="fixed bottom-6 right-6 z-[9999] bg-[#0f172a]/90 border border-white/10 px-4 py-2 rounded-full flex items-center gap-3 shadow-2xl backdrop-blur-sm">
+                <i class="fa-solid fa-circle-notch fa-spin text-emerald-400 text-sm"></i>
+                <span class="text-xs font-bold text-white tracking-wider font-mono">{{ loadingMessage || 'PROCESSING' }}</span>
+            </div>
+        </Transition>
+
     </div>
 </template>
 
@@ -576,5 +643,17 @@ input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { 
   -webkit-appearance: none; 
   margin: 0; 
+}
+
+/* Indeterminate Progress Bar Animation */
+@keyframes progress-indeterminate {
+  0% { left: -100%; width: 100%; }
+  50% { left: 100%; width: 20%; }
+  100% { left: -100%; width: 100%; }
+}
+
+.animate-progress-indeterminate {
+  position: relative;
+  animation: progress-indeterminate 1.5s infinite linear;
 }
 </style>
