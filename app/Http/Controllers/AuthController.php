@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -25,13 +26,27 @@ class AuthController extends Controller
             'nik'      => ['required'],
         ]);
 
-        $username = $credentials['username'];
+        // 1. Buat semua character yang masuk agar uppercase
+        $username = strtoupper($credentials['username']);
+        $nik = strtoupper($credentials['nik']);
+        $password = $credentials['password']; // Password tidak diubah ke uppercase
+
         Log::info("[AUTH] Percobaan login user: {$username}");
+
+        // 2. untuk NIK cari di database mapping_user_plant harus terdaftar di database, jika tidak ada jangan diizinkan masuk, NIK DAN SAP_ID HARUS SESUAI
+        $userMapping = DB::table('mapping_user_plant')->where('nik', $nik)->where('sap_id', $username)->first();
+
+        if (!$userMapping) {
+            Log::warning("[AUTH] Gagal Login: NIK '{$nik}' atau SAP ID '{$username}' tidak terdaftar atau tidak sesuai.");
+            return back()->withErrors([
+                'username' => 'Login Gagal: NIK atau SAP ID tidak terdaftar/sesuai.',
+            ]);
+        }
 
         try {
             $response = Http::timeout(30)->post("{$sapBaseUrl}/api/sap-login", [
-                'username' => $credentials['username'],
-                'password' => $credentials['password'],
+                'username' => $username,
+                'password' => $password,
             ]);
 
             if ($response->successful()) {
@@ -40,14 +55,14 @@ class AuthController extends Controller
                 $sessionId = $request->session()->getId();
                 $redisKey = "sap_session:{$sessionId}";
                 $sapData = [
-                    'username' => $credentials['username'],
-                    'password' => $credentials['password'],
-                    'nik'      => $credentials['nik'],
+                    'username' => $username,
+                    'password' => $password,
+                    'nik'      => $nik,
                     'sap_status' => 'connected'
                 ];
                 Redis::setex($redisKey, 7200, Crypt::encryptString(json_encode($sapData)));
-                $request->session()->put('user_nik', $credentials['nik']);
-                $request->session()->put('user_sap_id', $credentials['username']);
+                $request->session()->put('user_nik', $nik);
+                $request->session()->put('user_sap_id', $username);
                 return redirect()->intended('dashboard');
             } else {
                 $errorMsg = $response->json()['error'] ?? 'Gagal terhubung ke SAP.';
