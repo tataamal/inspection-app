@@ -237,15 +237,18 @@ class InspectionController extends Controller
         if (empty($sapUsername) || empty($sapPassword) || empty($sapNik)) {
             return response()->json(['status' => 'error', 'message' => 'Sesi Invalid (NIK/Pass kosong). Login ulang.'], 401);
         }
+        
         return response()->stream(function () use ($lotsData, $requestPlant, $udConfig, $sapUsername, $sapPassword, $sapNik) {
             $sapBaseUrl = config('services.sap.url');
             foreach ($lotsData as $lotRaw) {
                 $lot = (object) $lotRaw; 
                 $lotNumber = $lot->PRUEFLOS ?? null;
                 if (!$lotNumber) continue; 
+                
                 $status = 'ERROR';
                 $message = 'Unknown Error';
 
+                // 1. Eksekusi ke SAP
                 try {
                     $payload = [
                         'prueflos'        => $lotNumber,
@@ -275,32 +278,38 @@ class InspectionController extends Controller
                     $message = $e->getMessage();
                 }
 
+                // 2. Simpan ke Database (Update Or Create)
                 try {
-                    HistoryQualityManagement::create([
-                        'prueflos'           => $lotNumber,
-                        'plant'              => $requestPlant,
-                        'order_number'       => $lot->AUFNR ?? null,
-                        'material_code'      => $lot->MATNR ?? null,
-                        'material_desc'      => $lot->KTEXTMAT ?? null,
-                        'batch'              => $lot->CHARG ?? null,
-                        'quantity'           => $lot->LOSMENGE ?? 0,
-                        'uom'                => $lot->MENGENEINH ?? null,
-                        'sales_order'        => $lot->KDAUF ?? null,
-                        'sales_item'         => isset($lot->KDPOS) ? ltrim($lot->KDPOS, '0') : null, 
-                        'buyer_name'         => $lot->NAME1 ?? null,
-                        'customer_po'        => $lot->BSTNK ?? null,
-                        'inspector_sap_id'   => $sapUsername, 
-                        'inspector_nik'      => $sapNik,                  
-                        'ud_code'            => $udConfig['ud_code'],
-                        'ud_selected_set'    => $udConfig['ud_selected_set'],
-                        'status'             => $status,
-                        'sap_message'        => $message,
-                        'full_lot_snapshot'  => $lotRaw 
-                    ]);
+                    // Cek berdasarkan 'prueflos', jika ada update, jika tidak create.
+                    HistoryQualityManagement::updateOrCreate(
+                        ['prueflos' => $lotNumber], // Kunci pencarian (Unique Key)
+                        [
+                            'plant'              => $requestPlant,
+                            'order_number'       => $lot->AUFNR ?? null,
+                            'material_code'      => $lot->MATNR ?? null,
+                            'material_desc'      => $lot->KTEXTMAT ?? null,
+                            'batch'              => $lot->CHARG ?? null,
+                            'quantity'           => $lot->LOSMENGE ?? 0,
+                            'uom'                => $lot->MENGENEINH ?? null,
+                            'sales_order'        => $lot->KDAUF ?? null,
+                            'sales_item'         => isset($lot->KDPOS) ? ltrim($lot->KDPOS, '0') : null, 
+                            'buyer_name'         => $lot->NAME1 ?? null,
+                            'customer_po'        => $lot->BSTNK ?? null,
+                            'inspector_sap_id'   => $sapUsername, 
+                            'inspector_nik'      => $sapNik,                  
+                            'ud_code'            => $udConfig['ud_code'],
+                            'ud_selected_set'    => $udConfig['ud_selected_set'],
+                            'status'             => $status, // Status terbaru dari SAP
+                            'sap_message'        => $message, // Pesan terbaru
+                            'full_lot_snapshot'  => $lotRaw // Snapshot data terbaru
+                        ]
+                    );
 
                 } catch (\Exception $dbEx) {
                     Log::error("DB Save Fail Lot {$lotNumber}: " . $dbEx->getMessage());
                 }
+                
+                // 3. Kirim respon streaming ke Client
                 echo json_encode([
                     'lot' => $lotNumber,
                     'status' => $status,
