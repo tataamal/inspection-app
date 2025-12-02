@@ -24,11 +24,11 @@ const showFilters = ref(false); // Default false untuk user biasa agar tidak sem
 const datePickerRef = ref(null); 
 let fpInstance = null; 
 
-// Reactive Form untuk Server-Side Filtering (Berlaku untuk Admin & User History)
+// Reactive Form untuk Server-Side Filtering
 const form = reactive({
     startDate: props.filters?.startDate || '',
     endDate: props.filters?.endDate || '',
-    status: props.filters?.status || 'SUCCESS',
+    status: props.filters?.status || 'SUCCESS', // Default Success
     section: props.filters?.section || '',
     search: props.filters?.search || ''
 });
@@ -50,7 +50,6 @@ const filteredMrp = computed(() => {
 const toggleViewMode = (mode) => {
     viewMode.value = mode;
     if (mode === 'history') {
-        // Init flatpickr jika pindah ke tab history
         nextTick(() => initFlatpickr());
     }
 };
@@ -62,9 +61,8 @@ const goToInspectionList = (mrpItem) => {
     });
 };
 
-// --- WATCHER UNTUK SERVER-SIDE FILTERING (HISTORY) ---
+// --- WATCHER UNTUK SERVER-SIDE FILTERING ---
 const applyFilter = debounce(() => {
-    // Hanya jalankan filter jika sedang melihat history (User) atau Admin
     if (viewMode.value === 'history' || isAdmin.value) {
         router.get('/dashboard', form, {
             preserveState: true, 
@@ -74,9 +72,10 @@ const applyFilter = debounce(() => {
     }
 }, 500); 
 
+// FIXED: Tambahkan { immediate: true } agar filter 'SUCCESS' jalan saat pertama load
 watch(form, () => {
     applyFilter();
-}, { deep: true });
+}, { deep: true, immediate: true });
 
 // --- HELPER TIMEZONE ---
 const formatDateISO = (d) => {
@@ -102,9 +101,10 @@ const setDateRange = (type) => {
         const day = today.getDay() || 7; 
         if (day !== 1) start.setHours(-24 * (day - 1));
         else start = today;
-    } else if (type === 'month') {
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
-        end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (type === 'yesterday') {
+        // FIXED: Logika Kemarin (-1 Hari) yang bersih
+        start.setDate(today.getDate() - 1);
+        end.setDate(today.getDate() - 1);
     }
     
     form.startDate = formatDateISO(start);
@@ -173,6 +173,11 @@ const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
+};
+
+const removeLeadingZeros = (str) => {
+    if (!str) return '';
+    return str.replace(/^0+/, '');
 };
 
 const truncateText = (text, length) => {
@@ -263,8 +268,9 @@ const getStatusColor = (status) => {
                             <div class="flex flex-wrap gap-2 mb-1">
                                 <button @click="setDateRange('today')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">Hari Ini</button>
                                 <button @click="setDateRange('week')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">Minggu Ini</button>
-                                <button @click="setDateRange('month')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">Bulan Ini</button>
+                                <button @click="setDateRange('yesterday')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">Kemarin</button>
                                 <button @click="setDateRange('7days')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">-7 Hari</button>
+                                <button @click="setDateRange('30days')" class="px-3 py-1 rounded-md bg-white/5 border border-white/5 text-[0.65rem] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30 active:scale-95 active:bg-emerald-500/30 transition-all duration-150">-30 Hari</button>
                             </div>
 
                             <div class="relative group/date w-full">
@@ -340,11 +346,11 @@ const getStatusColor = (status) => {
                                         <div class="text-slate-200 font-medium leading-tight">
                                             {{ truncateText(item.material_desc, 40) }}
                                         </div>
-                                        <div class="text-xs text-slate-600 font-mono mt-0.5">{{ item.material_code }}</div>
+                                        <div class="text-xs text-slate-600 font-mono mt-0.5">{{ removeLeadingZeros(item.material_code) }}</div>
                                     </div>
                                     <div>
                                         <div class="text-[0.65rem] text-slate-500">Qty</div>
-                                        <div class="text-white font-mono">{{ parseFloat(item.quantity) }} {{ item.uom }}</div>
+                                        <div class="text-white font-mono">{{ parseFloat(item.quantity) }} {{ item.uom === 'ST' ? 'PC' : item.uom }}</div>
                                     </div>
                                 </div>
                                 <div class="flex items-center justify-between pt-3 border-t border-white/5">
@@ -382,25 +388,25 @@ const getStatusColor = (status) => {
                                     </td>
                                     <td class="p-4 align-top">
                                         <div class="text-indigo-400 font-mono text-sm font-bold">{{ item.sales_order || '-' }}</div>
-                                        <div class="text-slate-500 text-xs mt-0.5">Item: {{ item.sales_item || '-' }}</div>
+                                        <div class="text-white text-xs mt-0.5">Item: {{ item.sales_item || '-' }}</div>
                                     </td>
                                     <td class="p-4 align-top">
                                         <div class="text-white font-bold text-sm">{{ item.prueflos }}</div>
-                                        <div class="text-slate-500 text-xs mt-0.5" v-if="item.batch">Batch: {{ item.batch }}</div>
-                                        <div class="text-slate-600 text-xs" v-if="item.order_number">Order: {{ item.order_number }}</div>
+                                        <div class="text-emerald-500 text-xs mt-0.5" v-if="item.batch">Batch: {{ item.batch }}</div>
+                                        <div class="text-emerald-500 text-xs" v-if="item.order_number">Order: {{ item.order_number }}</div>
                                     </td>
                                     <td class="p-4 align-top">
                                         <div class="text-slate-200 font-medium text-sm leading-relaxed" :title="item.material_desc">
                                             {{ truncateText(item.material_desc, 40) }}
                                         </div>
-                                        <div class="text-xs text-slate-500 font-mono mt-1">{{ item.material_code }}</div>
+                                        <div class="text-xs text-emerald-500 font-mono mt-1">{{ removeLeadingZeros(item.material_code) }}</div>
                                     </td>
                                     <td class="p-4 align-top max-w-[150px]">
                                         <div class="truncate text-slate-300 text-sm font-bold" :title="item.buyer_name">{{ item.buyer_name || '-' }}</div>
                                         <div class="text-xs text-emerald-500 font-mono truncate">{{ item.customer_po || '-' }}</div>
                                     </td>
                                     <td class="p-4 align-top text-right font-mono text-slate-300 text-sm">
-                                        {{ parseFloat(item.quantity) }} <span class="text-xs text-slate-500">{{ item.uom }}</span>
+                                        {{ parseFloat(item.quantity) }} <span class="text-xs text-white">{{ item.uom === 'ST' ? 'PC' : item.uom }}</span>
                                     </td>
                                     <td class="p-4 align-top text-center">
                                         <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border" :class="getStatusColor(item.status)">
@@ -538,6 +544,57 @@ const getStatusColor = (status) => {
                         </button>
                     </div>
 
+                    <div v-if="showFilters" class="mb-6 bg-[#1e293b]/50 border border-white/10 rounded-2xl p-6 animate-fade-in-up relative overflow-hidden group">
+                        <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-[50px] pointer-events-none"></div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
+                            
+                            <!-- Date Range (Flatpickr) -->
+                            <div class="md:col-span-6 flex flex-col gap-1.5">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-[0.65rem] uppercase font-bold text-slate-300 tracking-wider ml-1">Periode Inspeksi</label>
+                                    <div class="flex gap-1">
+                                        <button @click="setDateRange('today')" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[0.6rem] text-slate-400 hover:text-white transition-colors border border-white/5">Hari Ini</button>
+                                        <button @click="setDateRange('7days')" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[0.6rem] text-slate-400 hover:text-white transition-colors border border-white/5">7 Hari</button>
+                                        <!-- Mengganti Bulan Ini menjadi Kemarin untuk User Biasa juga -->
+                                        <button @click="setDateRange('yesterday')" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[0.6rem] text-slate-400 hover:text-white transition-colors border border-white/5">Kemarin</button>
+                                    </div>
+                                </div>
+                                <div class="relative group/date">
+                                    <input 
+                                        ref="datePickerRef" 
+                                        type="text" 
+                                        placeholder="Pilih Rentang Tanggal..." 
+                                        class="w-full bg-black/40 rounded-xl border border-white/10 text-white text-sm py-2.5 pl-10 pr-4 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
+                                    >
+                                    <i class="fa-regular fa-calendar absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/date:text-indigo-400 transition-colors pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <!-- Status -->
+                            <div class="md:col-span-2 flex flex-col gap-1.5">
+                                <label class="text-[0.65rem] uppercase font-bold text-slate-300 tracking-wider ml-1">Status</label>
+                                <div class="relative h-[42px]">
+                                    <select v-model="form.status" class="w-full h-full appearance-none bg-black/40 rounded-xl border border-white/10 text-white text-sm pl-4 pr-10 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer">
+                                        <option value="">Semua</option>
+                                        <option value="SUCCESS">Success</option>
+                                        <option value="ERROR">Error</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <!-- Search -->
+                            <div class="md:col-span-4 flex flex-col gap-1.5">
+                                <label class="text-[0.65rem] uppercase font-bold text-slate-300 tracking-wider ml-1">Multi-Search (Spasi/Enter)</label>
+                                <div class="relative group/search h-[42px]">
+                                    <input type="text" v-model="form.search" placeholder="Lot A, Lot B, Material..." class="w-full h-full bg-black/40 rounded-xl border border-white/10 text-white text-sm pl-10 pr-4 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all">
+                                    <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/search:text-indigo-400 transition-colors"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- TABLE USER -->
                     <div class="bg-[#1e293b]/50 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
                         <div class="overflow-x-auto">
@@ -560,7 +617,7 @@ const getStatusColor = (status) => {
                                         </td>
                                         <td class="p-4">
                                             <div class="text-slate-200 font-medium line-clamp-1" :title="item.material_desc">{{ truncateText(item.material_desc, 30) }}</div>
-                                            <div class="text-xs text-slate-500 font-mono">{{ item.material_code }}</div>
+                                            <div class="text-xs text-slate-500 font-mono">{{ removeLeadingZeros(item.material_code) }}</div>
                                         </td>
                                         <td class="p-4 font-mono">{{ parseFloat(item.quantity) }} <span class="text-[0.65rem]">{{ item.uom }}</span></td>
                                         <td class="p-4 text-center">
