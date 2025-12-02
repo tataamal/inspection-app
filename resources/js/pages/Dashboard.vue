@@ -177,7 +177,13 @@ const formatDate = (dateString) => {
 
 const removeLeadingZeros = (str) => {
     if (!str) return '';
-    return str.replace(/^0+/, '');
+    // Cek apakah string HANYA berisi angka (0-9)
+    if (/^\d+$/.test(str)) {
+        // Hapus nol di depan. Jika hasilnya kosong (misal "000"), return "0"
+        return str.replace(/^0+/, '') || '0';
+    }
+    // Jika ada huruf/simbol, kembalikan apa adanya
+    return str;
 };
 
 const truncateText = (text, length) => {
