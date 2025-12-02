@@ -5,347 +5,249 @@
     <title>Laporan Riwayat Quality Management</title>
     <style>
         @page {
-            margin: 0.8cm 1.2cm;
+            margin: 0.5cm 1cm;
         }
         body {
             font-family: 'Arial', 'Helvetica', sans-serif;
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #1a1a1a;
             line-height: 1.2;
-            margin: 0;
-            padding: 0;
         }
         
-        /* --- COMPACT HEADER SECTION --- */
+        /* --- HEADER --- */
         .header {
             width: 100%;
-            padding-bottom: 8px;
-            margin-bottom: 12px;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
             border-bottom: 2px solid #10b981;
         }
+        .header-table { width: 100%; border-collapse: collapse; }
+        .header-table td { vertical-align: middle; }
+        .logo-img { max-height: 35px; }
+        .company-name { font-size: 12pt; font-weight: bold; color: #064e3b; text-transform: uppercase; }
+        .system-name { font-size: 7pt; color: #10b981; font-weight: bold; letter-spacing: 1px; }
+        .header-right { text-align: right; font-size: 7pt; color: #4b5563; }
         
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .header-table td {
-            vertical-align: middle;
-            padding: 0;
-        }
-        
-        .header-left {
-            width: 25%;
-            text-align: left;
-        }
-        
-        .logo-img {
-            max-width: 60px;
-            max-height: 40px;
-        }
-        
-        .header-center {
-            width: 50%;
-            text-align: center;
-        }
-        
-        .company-name {
-            font-size: 13pt;
-            font-weight: bold;
-            color: #064e3b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0;
-        }
-        
-        .system-name {
-            font-size: 8pt;
-            color: #10b981;
-            font-weight: bold;
-            letter-spacing: 1px;
-            margin: 2px 0 0 0;
-        }
-        
-        .header-right {
-            width: 25%;
-            text-align: right;
-            font-size: 7.5pt;
-            color: #4b5563;
-            line-height: 1.4;
-        }
-        
-        .header-right strong {
-            color: #1f2937;
-        }
-
-        /* --- COMPACT REPORT TITLE --- */
+        /* --- TITLE & FILTERS --- */
         .report-title {
             text-align: center;
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: bold;
-            margin: 8px 0 10px 0;
+            margin-bottom: 5px;
             color: #064e3b;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+        }
+        .filter-info {
+            text-align: center;
+            font-size: 7pt;
+            color: #6b7280;
+            margin-bottom: 10px;
+            font-style: italic;
         }
 
-        /* --- COMPACT TABLE STYLE --- */
+        /* --- TABLE --- */
         table.data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 7.5pt;
-            margin-top: 5px;
+            font-size: 7pt;
         }
-        
         table.data-table th {
             background-color: #f3f4f6;
             border: 1px solid #9ca3af;
-            padding: 5px 4px;
+            padding: 4px;
             text-align: left;
             text-transform: uppercase;
-            font-size: 7pt;
             font-weight: bold;
-            letter-spacing: 0.3px;
-            color: #000000;
+            color: #1f2937;
         }
-        
         table.data-table td {
             border: 1px solid #d1d5db;
-            padding: 4px 5px;
-            vertical-align: middle;
+            padding: 4px;
+            vertical-align: top;
         }
-        
         /* Zebra Striping */
-        table.data-table tbody tr:nth-child(odd) {
-            background-color: #ffffff;
-        }
-        
-        table.data-table tbody tr:nth-child(even) {
-            background-color: #f9fafb;
-        }
+        table.data-table tbody tr:nth-child(even) { background-color: #f9fafb; }
 
-        /* --- COMPACT CELL STYLING --- */
-        .cell-number {
-            text-align: center;
-            font-weight: bold;
-            color: #6b7280;
-            font-size: 7pt;
-        }
+        /* --- COLUMN STYLES --- */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .text-xs { font-size: 6.5pt; color: #6b7280; }
+        .text-code { font-family: 'Courier New', Courier, monospace; }
         
-        .cell-date {
-            font-weight: 600;
-            color: #1f2937;
-            font-size: 7.5pt;
-            line-height: 1.3;
-        }
-        
-        .inspection-lot {
-            font-weight: bold;
-            color: #064e3b;
-            font-size: 8pt;
-        }
-        
-        .plant-info {
-            color: #6b7280;
-            font-size: 6.5pt;
-            margin-top: 1px;
-        }
-        
-        .material-code {
-            font-weight: bold;
-            color: #1f2937;
-            font-size: 7.5pt;
-        }
-        
-        .material-desc {
-            color: #6b7280;
-            font-size: 6.5pt;
-            margin-top: 1px;
-        }
-        
-        .batch-info {
-            line-height: 1.4;
-            font-size: 7.5pt;
-        }
-        
-        .batch-label {
-            font-weight: bold;
-            color: #374151;
-        }
-        
-        .batch-value {
-            color: #1f2937;
-        }
-        
-        .qty-value {
-            text-align: right;
-            font-weight: bold;
-            font-size: 8pt;
-            color: #064e3b;
-        }
-        
-        .uom-label {
-            color: #6b7280;
-            font-size: 6.5pt;
-            font-weight: normal;
-        }
-        
-        .nik-box {
-            background-color: #f3f4f6;
-            padding: 3px 6px;
-            border-radius: 3px;
-            text-align: center;
-            font-weight: bold;
-            color: #1f2937;
-            font-size: 7.5pt;
-            display: inline-block;
-        }
-
-        /* Status Badges */
         .status-badge {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
             font-weight: bold;
-            font-size: 6.5pt;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
+            font-size: 6pt;
         }
-        
-        .status-success {
-            background-color: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
-        }
-        
-        .status-error {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
+        .status-success { background-color: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .status-error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
-        /* --- COMPACT FOOTER --- */
         .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 25px;
-            font-size: 7pt;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 5px;
-            text-align: center;
-            background-color: white;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            font-size: 6pt; color: #9ca3af; border-top: 1px solid #e5e7eb;
+            padding-top: 2px; text-align: center;
         }
-        
-        .page-number:after {
-            content: counter(page);
-        }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 20px;
-            color: #9ca3af;
-            font-style: italic;
-            font-size: 8pt;
-        }
+        .page-number:after { content: counter(page); }
     </style>
 </head>
 <body>
 
-    <!-- COMPACT HEADER (ONE LINE) -->
     <div class="header">
         <table class="header-table">
             <tr>
-                <td class="header-left">
-                    <img src="{{ $logo_path ?? '' }}" class="logo-img" alt="Logo">
+                <td style="width: 20%;">
+                    @if(isset($logo_path) && file_exists($logo_path))
+                        <img src="{{ $logo_path }}" class="logo-img" alt="Logo">
+                    @else
+                        <strong>KMI</strong>
+                    @endif
                 </td>
-                <td class="header-center">
+                <td style="width: 60%; text-align: center;">
                     <div class="company-name">PT. Kayu Mebel Indonesia</div>
                     <div class="system-name">Quality Management System</div>
                 </td>
-                <td class="header-right">
-                    <div><strong>Dicetak:</strong> {{ $user['username'] }} ({{ $user['nik'] }})</div>
-                    <div><strong>Tanggal:</strong> {{ $generated_at }}</div>
+                <td class="header-right" style="width: 20%;">
+                    <div><strong>User:</strong> {{ $user['username'] ?? 'Guest' }}</div>
+                    <div><strong>Tgl:</strong> {{ $generated_at }}</div>
                 </td>
             </tr>
         </table>
     </div>
 
-    <!-- COMPACT REPORT TITLE -->
-    <div class="report-title">Laporan Riwayat Usage Decision (UD)</div>
+    <div class="report-title">Laporan Riwayat Inspeksi</div>
+    
+    <!-- Tampilkan Info Filter yang Dipakai -->
+    <div class="filter-info">
+        Filter: 
+        @if($filters['start'] || $filters['end'])
+            Periode {{ $filters['start'] ?? '...' }} s/d {{ $filters['end'] ?? 'Now' }}
+        @else
+            Semua Periode
+        @endif
+        @if($filters['status']) | Status: {{ $filters['status'] }} @endif
+        @if($filters['section']) | Bagian: {{ $filters['section'] }} @endif
+        @if($filters['search']) | Pencarian: "{{ $filters['search'] }}" @endif
+    </div>
 
-    <!-- COMPACT DATA TABLE -->
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 3%; text-align: center;">No</th>
-                <th style="width: 11%;">Tanggal</th>
-                <th style="width: 13%;">Inspection Lot</th>
-                <th style="width: 28%;">Material</th>
-                <th style="width: 17%;">Batch / Order</th>
-                <th style="width: 10%; text-align: right;">Qty</th>
-                <th style="width: 9%; text-align: center;">NIK</th>
-                <th style="width: 9%; text-align: center;">Status</th>
+                <th style="width: 3%;" class="text-center">No</th>
+                
+                @if(!isset($hidden_columns['date']))
+                <th style="width: 8%;">Tanggal</th>
+                @endif
+                
+
+                @if(!isset($hidden_columns['so']))
+                <th style="width: 10%;">Sales Order</th>
+                @endif
+
+                @if(!isset($hidden_columns['buyer']))
+                <th style="width: 12%;">Buyer / PO</th>
+                @endif
+
+                @if(!isset($hidden_columns['material']))
+                <th style="width: 20%;">Material</th>
+                @endif
+
+                @if(!isset($hidden_columns['order']))
+                <th style="width: 10%;">Batch / Order</th>
+                @endif
+
+                @if(!isset($hidden_columns['qty']))
+                <th style="width: 8%;" class="text-right">Qty</th>
+                @endif
+
+                @if(!isset($hidden_columns['status']))
+                <th style="width: 14%;">Status & Log</th>
+                @endif
             </tr>
         </thead>
         <tbody>
             @forelse($data as $index => $item)
             <tr>
-                <td class="cell-number">{{ $index + 1 }}</td>
+                <td class="text-center">{{ $index + 1 }}</td>
                 
-                <td class="cell-date">
-                    {{ \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') }}<br>
-                    <small style="color: #6b7280; font-size: 6.5pt;">{{ \Carbon\Carbon::parse($item->created_at)->format('H:i') }}</small>
-                </td>
-                
+                @if(!isset($hidden_columns['date']))
                 <td>
-                    <div class="inspection-lot">{{ $item->prueflos }}</div>
-                    <div class="plant-info">Plant: {{ $item->plant }}</div>
+                    <div class="font-bold">{{ \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') }}</div>
+                    <div class="text-xs">{{ \Carbon\Carbon::parse($item->created_at)->format('H:i') }}</div>
                 </td>
-                
+                @endif
+
+                @if(!isset($hidden_columns['so']))
                 <td>
-                    <div class="material-code">{{ $item->material_code }}</div>
-                    <div class="material-desc">{{ $item->material_desc ?? '-' }}</div>
+                    <div class="font-bold text-code" style="color: #4338ca;">{{ $item->sales_order ?? '-' }}</div>
+                    <div class="text-xs">Item: {{ $item->sales_item ?? '' }}</div>
                 </td>
-                
-                <td class="batch-info">
-                    <div><span class="batch-label">B:</span> {{ $item->batch ?? '-' }}</div>
-                    <div><span class="batch-label">O:</span> {{ $item->order_number ?? '-' }}</div>
+                @endif
+
+                @if(!isset($hidden_columns['buyer']))
+                <td>
+                    <div class="font-bold" style="font-size: 6.5pt;">{{ Str::limit($item->buyer_name, 25) }}</div>
+                    <div class="text-xs text-code">{{ $item->customer_po ?? '-' }}</div>
                 </td>
-                
-                <td class="qty-value">
-                    {{ number_format($item->quantity, 0, ',', '.') }}
-                    <span class="uom-label">{{ $item->uom == 'ST' ? 'PC' : $item->uom }}</span>
+                @endif
+
+                @if(!isset($hidden_columns['material']))
+                <td>
+                    <div style="font-size: 7pt;">{{ $item->material_desc }}</div>
+                    <div class="text-xs text-code">{{ $item->material_code }}</div>
                 </td>
-                
-                <td style="text-align: center;">
-                    <div class="nik-box">{{ $item->inspector_nik }}</div>
-                </td>
-                
-                <td style="text-align: center;">
-                    @if($item->status == 'SUCCESS')
-                        <span class="status-badge status-success">OK</span>
-                    @else
-                        <span class="status-badge status-error">{{ $item->status }}</span>
+                @endif
+
+                @if(!isset($hidden_columns['order']))
+                <td>
+                    @if($item->batch)
+                    <div><span class="text-xs">B:</span> <span class="text-code font-bold">{{ $item->batch }}</span></div>
+                    @endif
+                    @if($item->order_number)
+                    <div><span class="text-xs">O:</span> <span class="text-code">{{ $item->order_number }}</span></div>
                     @endif
                 </td>
+                @endif
+
+                @if(!isset($hidden_columns['qty']))
+                <td class="text-left">
+                    <div class="font-bold">{{ number_format($item->quantity, 0, ',', '.') }}</div>
+                    <div class="text-xs">{{ $item->uom }}</div>
+                </td>
+                @endif
+
+                @if(!isset($hidden_columns['status']))
+                <td>
+                    <div style="margin-bottom: 2px;">
+                        @if($item->status == 'SUCCESS')
+                            <span class="status-badge status-success">SUCCESS</span>
+                        @else
+                            <span class="status-badge status-error">GAGAL UD</span>
+                        @endif
+                    </div>
+                    @if($item->status == 'ERROR')
+                        <div style="font-size: 6pt; color: #991b1b; font-style: italic;">
+                            {{ Str::limit($item->sap_message, 40) }}
+                        </div>
+                    @endif
+                    <div class="text-xs" style="margin-top:2px;">By: {{ $item->inspector_nik }}</div>
+                </td>
+                @endif
             </tr>
             @empty
             <tr>
-                <td colspan="8" class="empty-state">
-                    Tidak ada data riwayat yang ditemukan.
+                <td colspan="10" style="text-align: center; padding: 20px; color: #9ca3af; font-style: italic;">
+                    Tidak ada data yang ditemukan sesuai filter.
                 </td>
             </tr>
             @endforelse
         </tbody>
     </table>
 
-    <!-- COMPACT FOOTER -->
     <div class="footer">
-        PT. Kayu Mebel Indonesia &bull; Quality Management System &bull; Hal. <span class="page-number"></span>
+        Generated by KMI Inspection System | Halaman <span class="page-number"></span>
     </div>
 
 </body>

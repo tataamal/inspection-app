@@ -13,6 +13,111 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+
+    private function determineSection($item)
+    {
+        // Decode JSON snapshot jika ada
+        $snapshot = isset($item->full_lot_snapshot) ? json_decode($item->full_lot_snapshot, true) : [];
+        
+        // Ambil DISPO (MRP Controller) dari snapshot
+        $dispo = $snapshot['DISPO'] ?? '';
+        
+        // Ambil Deskripsi Material
+        $maktx = $item->material_desc ?? ($snapshot['KTEXTMAT'] ?? ''); 
+
+        // Logika Packing berdasarkan DISPO
+        if (in_array($dispo, ['D24', 'G32'])) {
+            return 'Packing';
+        }
+
+        // Logika Painting berdasarkan DISPO
+        if (in_array($dispo, ['G31', 'D23', 'D28', 'MA4', 'MA7', 'MF4'])) {
+            return 'Painting';
+        }
+
+        // Logika Painting Khusus (DISPO D22 & ada 'UNF' di deskripsi)
+        if ($dispo === 'D22' && stripos($maktx, 'UNF') !== false) {
+            return 'Painting';
+        }
+
+        return 'Other';
+    }
+
+    /**
+     * Helper untuk menerapkan filter query (Reusable & Konsisten)
+     */
+    private function applyFilters($query, Request $request)
+    {
+        // 1. Filter Tanggal (Handle startDate dari Vue DAN start_date legacy)
+        if ($request->filled('startDate')) {
+            $query->whereDate('created_at', '>=', $request->startDate);
+        } elseif ($request->filled('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+
+        if ($request->filled('endDate')) {
+            $query->whereDate('created_at', '<=', $request->endDate);
+        } elseif ($request->filled('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
+        // 2. Filter Status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // 3. Filter Bagian (Section) - UPDATED: Menggunakan DISPO dari JSON full_lot_snapshot
+        if ($request->filled('section')) {
+            $section = $request->section;
+            if ($section === 'Packing') {
+                $query->whereIn('full_lot_snapshot->DISPO', ['D24', 'G32']);
+            } elseif ($section === 'Painting') {
+                $query->where(function($q) {
+                    $q->whereIn('full_lot_snapshot->DISPO', ['G31', 'D23', 'D28', 'MA4', 'MA7', 'MF4'])
+                      ->orWhere(function($subQ) {
+                          $subQ->where('full_lot_snapshot->DISPO', 'D22')
+                               ->where('material_desc', 'LIKE', '%UNF%');
+                      });
+                });
+            }
+        }
+
+        // 4. Filter Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            // Exact Match ("...")
+            if (preg_match('/"([^"]+)"/', $search, $matches)) {
+                $term = $matches[1];
+                $query->where(function($q) use ($term) {
+                    $q->where('prueflos', $term)
+                      ->orWhere('batch', $term)
+                      ->orWhere('material_code', $term)
+                      ->orWhere('order_number', $term);
+                });
+            } else {
+                // Multi-keyword Search
+                $terms = preg_split('/[\s,]+/', strtolower($search), -1, PREG_SPLIT_NO_EMPTY);
+                $query->where(function($q) use ($terms) {
+                    foreach ($terms as $term) {
+                        $q->where(function($subQ) use ($term) {
+                            $subQ->where(DB::raw('LOWER(prueflos)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(material_desc)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(material_code)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(sales_order)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(buyer_name)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(customer_po)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(order_number)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(batch)'), 'LIKE', "%{$term}%")
+                                 ->orWhere(DB::raw('LOWER(ud_code)'), 'LIKE', "%{$term}%");
+                        });
+                    }
+                });
+            }
+        }
+
+        return $query;
+    }
+
     public function index(Request $request)
     {
         $sessionId = $request->session()->getId();
@@ -27,44 +132,46 @@ class DashboardController extends Controller
             try {
                 $decrypted = Crypt::decryptString(Redis::get($redisKey));
                 $userData = json_decode($decrypted, true);
-            } catch (\Exception $e) {
-                // Handle error decrypt
-            }
+            } catch (\Exception $e) {}
         }
+
         $myMrpList = MappingUserPlant::where('nik', $userData['nik'])
                         ->select('id', 'plant', 'mrp as code', 'nama_karyawan as name') 
                         ->get();
-        $historyList = [];
-        if ($userData['username'] === 'KMI-U124' && $userData['nik'] === '10001069') {
-            $validNiks = DB::table('mapping_user_plant')
-                            ->where('sap_id', $userData['username'])
-                            ->pluck('nik')
-                            ->toArray();
-            if (empty($validNiks)) {
-                $validNiks = [$userData['nik']];
-            }
 
-            $historyList = DB::table('history_quality_management')
-                            ->whereIn('inspector_nik', $validNiks)
-                            ->orderBy('created_at', 'desc')
-                            ->limit(100)
-                            ->get();
+        // --- QUERY BUILDER ---
+        $query = DB::table('history_quality_management');
 
-        } else {
-            $historyList = DB::table('history_quality_management')
-                            ->where('inspector_nik', $userData['nik'])
-                            ->orderBy('created_at', 'desc')
-                            ->limit(50) // Batasi 50 terakhir
-                            ->get();
+        // A. Filter Role (Admin vs User)
+        if (!isset($userData['role']) || $userData['role'] !== 'admin') {
+            $query->where('inspector_nik', $userData['nik']);
         }
+
+        // B. Terapkan Filter (Search, Date, Status) di Server Side
+        // Ini PENTING karena pagination hanya mengambil sebagian data.
+        $this->applyFilters($query, $request);
+
+        // C. Eksekusi Pagination (10 per halaman)
+        $historyList = $query->orderBy('created_at', 'desc')
+                             ->paginate(6)
+                             ->withQueryString(); // Agar parameter filter tetap ada saat klik page 2, 3, dst
+
+        // D. Transformasi Data (Menambah atribut 'section')
+        // Gunakan 'through' untuk memodifikasi items di dalam paginator
+        $historyList->through(function ($item) {
+            $item->section = $this->determineSection($item);
+            return $item;
+        });
 
         return Inertia::render('Dashboard', [
             'authUser' => [
                 'username' => $userData['username'],
-                'nik'      => $userData['nik']
+                'nik'      => $userData['nik'],
+                'role'     => $userData['role'] ?? 'user'
             ],
             'mrpList' => $myMrpList,
-            'historyList' => $historyList
+            'historyList' => $historyList, // Sekarang bentuknya Object Paginator (data, links, meta), bukan Array flat
+            'filters' => $request->all(['search', 'status', 'section', 'startDate', 'endDate']) // Kirim balik state filter ke frontend
         ]);
     }
 
@@ -78,47 +185,51 @@ class DashboardController extends Controller
             try {
                 $decrypted = Crypt::decryptString(Redis::get($redisKey));
                 $userData = json_decode($decrypted, true);
-            } catch (\Exception $e) { /* Handle error */ }
-        }
-        if ($userData['username'] !== 'KMI-U124' || $userData['nik'] !== '10001069') {
-            abort(403, 'Unauthorized action.');
-        }
-        $validNiks = DB::table('mapping_user_plant')
-                        ->where('sap_id', $userData['username'])
-                        ->pluck('nik')
-                        ->toArray();
-
-        if (empty($validNiks)) {
-            $validNiks = [$userData['nik']];
-        }
-        $query = DB::table('history_quality_management')
-                    ->whereIn('inspector_nik', $validNiks);
-        if ($request->has('start_date') && $request->start_date) {
-            $query->whereDate('created_at', '>=', $request->start_date);
-        }
-        if ($request->has('end_date') && $request->end_date) {
-            $query->whereDate('created_at', '<=', $request->end_date);
+            } catch (\Exception $e) { }
         }
 
+        if (!isset($userData['role']) || $userData['role'] !== 'admin') {
+             abort(403, 'Unauthorized action.');
+        }
+
+        $query = DB::table('history_quality_management');
+
+        // ============================================================
+        // PENTING: Panggil Helper applyFilters disini!
+        // Jangan menulis ulang logika filter manual yang menyebabkan bug parameter.
+        // Helper ini sudah menangani 'startDate' (Vue) vs 'start_date'.
+        // ============================================================
+        $this->applyFilters($query, $request);
+
+        // Ambil data (tanpa limit/paginate untuk export)
         $historyData = $query->orderBy('created_at', 'desc')->get();
+        
+        $historyData->transform(function($item) {
+            $item->section = $this->determineSection($item);
+            return $item;
+        });
+
+        // Kolom Sembunyi
         $hiddenColumns = [];
         $columnsToCheck = ['date', 'lot', 'material', 'so', 'buyer', 'order', 'qty', 'ud', 'status'];
-        
         foreach ($columnsToCheck as $col) {
             if ($request->has("hide_{$col}")) {
                 $hiddenColumns[$col] = true;
             }
         }
 
-        // 6. Generate PDF
         $pdf = Pdf::loadView('reports.history_qm_pdf', [
             'data' => $historyData,
             'user' => $userData,
             'generated_at' => Carbon::now()->format('d F Y, H:i:s'),
             'logo_path' => public_path('images/KMI.png'),
             'filters' => [
-                'start' => $request->start_date,
-                'end' => $request->end_date
+                // Kirim parameter yang ada (bisa startDate atau start_date) untuk label di PDF
+                'start' => $request->startDate ?? $request->start_date,
+                'end' => $request->endDate ?? $request->end_date,
+                'status' => $request->status,
+                'section' => $request->section,
+                'search' => $request->search
             ],
             'hidden_columns' => $hiddenColumns 
         ]);

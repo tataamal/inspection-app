@@ -58,11 +58,13 @@ class AuthController extends Controller
                     'username' => $username,
                     'password' => $password,
                     'nik'      => $nik,
-                    'sap_status' => 'connected'
+                    'sap_status' => 'connected',
+                    'role' => $userMapping->role
                 ];
                 Redis::setex($redisKey, 7200, Crypt::encryptString(json_encode($sapData)));
                 $request->session()->put('user_nik', $nik);
                 $request->session()->put('user_sap_id', $username);
+                $request->session()->put('user_role', $userMapping->role);
                 return redirect()->intended('dashboard');
             } else {
                 $errorMsg = $response->json()['error'] ?? 'Gagal terhubung ke SAP.';
