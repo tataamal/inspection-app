@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Models\HistoryQualityManagement;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 
 class InspectionController extends Controller
@@ -330,5 +332,131 @@ class InspectionController extends Controller
             'X-Accel-Buffering' => 'no',
             'Cache-Control' => 'no-cache',
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        // 1. Validasi Input
+        $validated = $request->validate([
+            'nik_qc' => 'required',
+            'qty_accepted' => 'required|numeric|min:0',
+            'qty_reject'   => 'required|numeric|min:0',
+            'defects'      => 'nullable|array',
+            'cause_effect' => 'nullable|string',
+            'correction'   => 'nullable|string',
+            
+            // Validasi gambar (array string base64)
+            'images'       => 'nullable|array',
+            'images.front' => 'nullable|string',
+            'images.back'  => 'nullable|string',
+            'images.top'   => 'nullable|string',
+            'images.bottom'=> 'nullable|string',
+
+            // Data AQL
+            'aql_critical_found' => 'nullable|numeric',
+            // ... tambahkan validasi lain sesuai kebutuhan
+        ]);
+
+        // 2. Ambil Sesi SAP (Untuk Username/Pass pengirim)
+        $sessionId = $request->session()->getId();
+        $redisKey = "sap_session:{$sessionId}";
+        $sapCreds = [];
+
+        if (Redis::exists($redisKey)) {
+            $decrypted = Crypt::decryptString(Redis::get($redisKey));
+            $sapCreds = json_decode($decrypted, true);
+        } else {
+            return redirect()->back()->withErrors(['message' => 'Sesi SAP habis, silakan login ulang.']);
+        }
+
+        DB::beginTransaction();
+        try {
+            // 3. Proses Upload Gambar (Base64 ke File Fisik)
+            $savedImages = [];
+            $lotNumber = $request->input('lot_number', 'unknown'); // Pastikan Vue kirim lot_number jika ada, atau ambil dari sesi/url
+            
+            foreach ($request->input('images', []) as $side => $base64String) {
+                if (!empty($base64String)) {
+                    // Hapus header base64 (data:image/jpeg;base64,...)
+                    $imageParts = explode(";base64,", $base64String);
+                    if (count($imageParts) >= 2) {
+                        $imageTypeAux = explode("image/", $imageParts[0]);
+                        $imageType = $imageTypeAux[1] ?? 'jpeg';
+                        $imageBase64 = base64_decode($imageParts[1]);
+                        
+                        // Buat nama file unik
+                        $fileName = "inspection/{$lotNumber}_{$side}_" . time() . ".{$imageType}";
+                        
+                        // Simpan ke Storage (public/inspection/...)
+                        Storage::disk('public')->put($fileName, $imageBase64);
+                        
+                        $savedImages[$side] = $fileName;
+                    }
+                }
+            }
+
+            // 4. Hitung UD Code (Otomatis logic sederhana)
+            // Logic: Jika Reject > 0 maka 'R' (Reject), jika 0 maka 'A' (Accept)
+            // Sesuaikan dengan logic bisnis plant Anda (seperti di bulkPass)
+            $udCode = ($validated['qty_reject'] > 0) ? 'R' : 'A';
+            
+            // 5. Kirim ke SAP (Opsional: Menggunakan endpoint send_usage_decision seperti bulkPass)
+            $sapBaseUrl = config('services.sap.url');
+            
+            // NOTE: Sesuaikan logic Plant/UD Set seperti di function bulkPass Anda
+            // Contoh sederhana:
+            $payloadSAP = [
+                'prueflos'        => $lotNumber, 
+                'username'        => $sapCreds['username'],
+                'password'        => $sapCreds['password'],
+                'nik'             => $sapCreds['nik'],
+                'plant'           => '1000', // Sesuaikan logika dynamic plant
+                'ud_code'         => $udCode,
+                'ud_selected_set' => 'Z1',   // Sesuaikan
+                'ud_code_group'   => 'ZI',   // Sesuaikan
+                'stock_posting'   => 'X'
+            ];
+
+            // Uncomment jika ingin langsung kirim ke SAP saat klik simpan
+            /*
+            $responseSAP = Http::timeout(60)->post("{$sapBaseUrl}/api/send_usage_decision", $payloadSAP);
+            if (!$responseSAP->successful()) {
+                throw new \Exception("Gagal kirim ke SAP: " . $responseSAP->body());
+            }
+            */
+
+            // 6. Simpan ke Database Lokal (HistoryQualityManagement atau tabel InspectionDetail)
+            // Disini saya contohkan simpan ke HistoryQualityManagement seperti bulkPass
+            HistoryQualityManagement::create([
+                'prueflos'       => $lotNumber,
+                'inspector_nik'  => $validated['nik_qc'],
+                'quantity'       => $validated['qty_accepted'], // Total atau accepted?
+                'status'         => 'SUCCESS', // Atau 'PENDING'
+                'sap_message'    => 'Manual Inspection Input',
+                'ud_code'        => $udCode,
+                // Simpan data detail inspection (Defect, Notes, Images) ke kolom JSON atau tabel terpisah
+                'full_lot_snapshot' => json_encode([
+                    'defects'      => $validated['defects'],
+                    'cause_effect' => $validated['cause_effect'],
+                    'correction'   => $validated['correction'],
+                    'images'       => $savedImages,
+                    'aql'          => [
+                        'critical' => $request->input('aql_critical_found'),
+                        'major'    => $request->input('aql_major_found'),
+                        'minor'    => $request->input('aql_minor_found'),
+                    ]
+                ])
+            ]);
+
+            DB::commit();
+
+            // 7. Redirect kembali
+            return redirect()->back()->with('success', 'Data inspeksi berhasil disimpan!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error storing inspection: " . $e->getMessage());
+            return redirect()->back()->withErrors(['message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
+        }
     }
 }

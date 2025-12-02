@@ -118,6 +118,7 @@ const filteredLots = computed(() => {
     );
 });
 
+
 const isAllSelected = computed(() => filteredLots.value.length > 0 && selectedLots.value.length === filteredLots.value.length);
 const isIndeterminate = computed(() => selectedLots.value.length > 0 && selectedLots.value.length < filteredLots.value.length);
 
@@ -152,15 +153,31 @@ const getXsrfToken = () => {
     return null;
 };
 
+const progressPercentage = computed(() => {
+    const { total, success, fail } = progressStats.value;
+    if (total === 0) return 0;
+    const processed = success + fail;
+    return Math.round((processed / total) * 100);
+});
+
+const processedCount = computed(() => {
+    return progressStats.value.success + progressStats.value.fail;
+});
+
 const bulkPass = async () => {
+    // 1. Cek Lock Tanggal 1
     if (isMonthlyLocked.value) {
         showLockAlert();
         return;
     }
 
+    // 2. Validasi Seleksi
     if (selectedLots.value.length === 0) return;
+    
+    // Ambil data lengkap berdasarkan ID yang dipilih
     const fullLotsData = props.initialLots.filter(lot => selectedLots.value.includes(lot.PRUEFLOS));
 
+    // 3. Validasi Status Lot (TECO/UD)
     for (const lot of fullLotsData) {
         const config = getStatusConfig(lot.STATS);
         if (config.action !== 'allow') {
@@ -169,6 +186,7 @@ const bulkPass = async () => {
         }
     }
 
+    // 4. Konfirmasi SweetAlert
     const result = await Swal.fire({
         title: 'Konfirmasi Usage Decision',
         html: `<p class="text-sm text-slate-300">Memproses <b>${selectedLots.value.length} lot</b>.</p>`,
@@ -181,25 +199,86 @@ const bulkPass = async () => {
 
     if (!result.isConfirmed) return;
 
+    // 5. Setup UI State (Buka Modal Hitam)
     isProcessingBulk.value = true;
     isSyncing.value = false;
     showProgressModal.value = true;
     progressLogs.value = [];
     progressStats.value = { success: 0, fail: 0, total: selectedLots.value.length };
 
-    // ... (Logika fetch streaming sama seperti sebelumnya, disingkat untuk keringkasan) ...
-    // Di real code, masukkan logika fetch streaming di sini
     try {
-       // Simulasi fetch sukses (Ganti dengan kode fetch asli Anda)
-       const xsrfToken = getXsrfToken();
-       const response = await fetch('/inspection/bulk-pass', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': xsrfToken },
-           body: JSON.stringify({ lots: fullLotsData, plant: props.plantCode })
-       });
-       // ... handling stream ...
+        const xsrfToken = getXsrfToken();
+        
+        // --- REQUEST KE BACKEND ---
+        const response = await fetch('/inspection/bulk-pass', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-XSRF-TOKEN': xsrfToken,
+                // Header ini memberi tahu browser/server kita mengharapkan stream
+                'Accept': 'application/x-ndjson' 
+            },
+            body: JSON.stringify({ lots: fullLotsData, plant: props.plantCode })
+        });
+
+        // --- STREAM READER LOGIC (INI YANG HILANG SEBELUMNYA) ---
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            // Baca chunk data dari server
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            // Decode binary ke text dan tambahkan ke buffer
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Pecah berdasarkan baris baru (\n) karena Controller mengirim NDJSON
+            const lines = buffer.split('\n');
+            
+            // Simpan potongan terakhir yang mungkin belum lengkap untuk loop berikutnya
+            buffer = lines.pop(); 
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+
+                    // Cek Sinyal Selesai dari Controller
+                    if (data.status === 'DONE') {
+                        isProcessingBulk.value = false; // Matikan Loader Spinner
+                        
+                        // Auto refresh data agar list terupdate
+                        refreshData(); 
+                    } else {
+                        // Tambah Log ke Array (Langsung tampil di Modal)
+                        progressLogs.value.push(data);
+                        
+                        // Update Counter Success/Fail
+                        if(data.status === 'SUCCESS') progressStats.value.success++;
+                        else progressStats.value.fail++;
+
+                        // Auto Scroll ke bawah modal log
+                        await nextTick();
+                        if (logContainerRef.value) {
+                            logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error parsing JSON stream:", err);
+                }
+            }
+        }
+
     } catch (e) {
-        // ... error handling ...
+        console.error("Fetch Error:", e);
+        progressLogs.value.push({ 
+            lot: 'SYSTEM', 
+            status: 'ERROR', 
+            message: 'Koneksi terputus atau terjadi kesalahan server.' 
+        });
+        isProcessingBulk.value = false; 
     }
 };
 
@@ -557,29 +636,119 @@ onMounted(() => {
         </Transition>
 
         <!-- Progress Modal (For Bulk Actions - Keeping this for detailed logs) -->
-        <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+        <Transition 
+            enter-active-class="transition duration-300 ease-out" 
+            enter-from-class="opacity-0 scale-95" 
+            enter-to-class="opacity-100 scale-100" 
+            leave-active-class="transition duration-200 ease-in" 
+            leave-from-class="opacity-100 scale-100" 
+            leave-to-class="opacity-0 scale-95"
+        >
             <div v-if="showProgressModal" class="fixed inset-0 z-[120] flex items-center justify-center px-4">
-                <div class="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
-                <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ring-1 ring-white/10">
-                    <div class="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
-                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
-                            <i v-if="isProcessingBulk" class="fa-solid fa-circle-notch fa-spin text-emerald-500"></i>
-                            <i v-else class="fa-solid fa-check-circle text-emerald-500"></i>
-                            {{ isProcessingBulk ? 'Processing Bulk UD...' : 'Execution Finished' }}
-                        </h3>
-                    </div>
-                    <div class="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm bg-[#0B1120] scroll-smooth" ref="logContainerRef">
-                        <div v-for="(log, idx) in progressLogs" :key="idx" class="flex items-start gap-3 p-2 rounded border border-l-4 transition-all" :class="log.status === 'SUCCESS' ? 'bg-emerald-950/20 border-white/5 border-l-emerald-500' : 'bg-red-950/20 border-white/5 border-l-red-500'">
-                             <div class="mt-0.5 shrink-0"><i :class="log.status === 'SUCCESS' ? 'fa-solid fa-check text-emerald-500' : 'fa-solid fa-triangle-exclamation text-red-500'"></i></div>
-                             <div>
-                                 <div class="flex justify-between items-center mb-0.5"><span class="font-bold text-slate-200">{{ log.lot }}</span></div>
-                                 <p class="text-xs text-slate-400">{{ log.message }}</p>
-                             </div>
+                <div class="absolute inset-0 bg-[#0B1120]/90 backdrop-blur-md"></div>
+                
+                <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ring-1 ring-white/10">
+                    
+                    <div class="p-6 bg-gradient-to-b from-[#1e293b] to-[#0f172a] border-b border-white/5 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-end mb-4">
+                                <div>
+                                    <h3 class="text-white font-bold text-xl flex items-center gap-2">
+                                        <span v-if="isProcessingBulk" class="relative flex h-3 w-3">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                        </span>
+                                        <i v-else class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+                                        
+                                        {{ isProcessingBulk ? 'Processing Bulk UD...' : 'Process Completed' }}
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-1 font-mono">
+                                        {{ isProcessingBulk ? 'Sending data to SAP & updating local DB...' : 'All tasks finished.' }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-3xl font-black text-white tracking-tighter">{{ progressPercentage }}%</span>
+                                </div>
+                            </div>
+
+                            <div class="relative h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
+                                <div 
+                                    class="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                                    :style="{ width: `${progressPercentage}%` }"
+                                ></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="p-4 border-t border-white/5 bg-white/5 flex justify-end">
-                        <button @click="closeProgressModal" :disabled="isProcessingBulk || isSyncing" class="px-6 py-2 rounded-xl text-sm font-bold transition-all" :class="(isProcessingBulk || isSyncing) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'">Close</button>
+
+                    <div class="grid grid-cols-3 divide-x divide-white/5 border-b border-white/5 bg-[#162032]">
+                        <div class="p-4 text-center">
+                            <div class="text-[0.65rem] uppercase font-bold text-slate-500 tracking-wider mb-1">Total Lots</div>
+                            <div class="text-xl font-bold text-white">{{ progressStats.total }}</div>
+                        </div>
+                        <div class="p-4 text-center bg-emerald-500/5">
+                            <div class="text-[0.65rem] uppercase font-bold text-emerald-500/80 tracking-wider mb-1">Success</div>
+                            <div class="text-xl font-bold text-emerald-400">{{ progressStats.success }}</div>
+                        </div>
+                        <div class="p-4 text-center bg-red-500/5">
+                            <div class="text-[0.65rem] uppercase font-bold text-red-500/80 tracking-wider mb-1">Failed</div>
+                            <div class="text-xl font-bold text-red-400">{{ progressStats.fail }}</div>
+                        </div>
                     </div>
+
+                    <div class="flex-1 overflow-y-auto bg-[#0B1120] relative scroll-smooth" ref="logContainerRef">
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
+                            <i class="fa-solid fa-terminal text-9xl text-white"></i>
+                        </div>
+
+                        <div class="p-4 space-y-2 relative z-10 font-mono text-sm">
+                            <TransitionGroup name="list">
+                                <div 
+                                    v-for="(log, idx) in progressLogs" 
+                                    :key="idx" 
+                                    class="flex items-start gap-3 p-3 rounded-lg border border-l-[3px] transition-all duration-300" 
+                                    :class="log.status === 'SUCCESS' 
+                                        ? 'bg-emerald-950/10 border-white/5 border-l-emerald-500' 
+                                        : 'bg-red-950/10 border-white/5 border-l-red-500'"
+                                >
+                                    <div class="mt-0.5 shrink-0">
+                                        <i :class="log.status === 'SUCCESS' ? 'fa-solid fa-check text-emerald-500' : 'fa-solid fa-xmark text-red-500'"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex justify-between items-center mb-0.5">
+                                            <span class="font-bold text-slate-200 tracking-wide">{{ log.lot }}</span>
+                                            <span class="text-[0.6rem] px-1.5 py-0.5 rounded bg-white/5 text-slate-500">{{ log.status }}</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400 leading-relaxed break-words">{{ log.message }}</p>
+                                    </div>
+                                </div>
+                            </TransitionGroup>
+
+                            <div class="h-4"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-white/5 bg-[#162032] flex justify-between items-center">
+                        <span class="text-xs text-slate-500 animate-pulse" v-if="isProcessingBulk">
+                            Processing item {{ processedCount + 1 }} of {{ progressStats.total }}...
+                        </span>
+                        <span class="text-xs text-emerald-500 font-bold" v-else>
+                            <i class="fa-solid fa-thumbs-up mr-1"></i> Job Done
+                        </span>
+
+                        <button 
+                            @click="closeProgressModal" 
+                            :disabled="isProcessingBulk || isSyncing" 
+                            class="px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg transform active:scale-95" 
+                            :class="(isProcessingBulk || isSyncing) 
+                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50' 
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'"
+                        >
+                            {{ isProcessingBulk ? 'Please Wait...' : 'Close Window' }}
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </Transition>
@@ -608,5 +777,15 @@ onMounted(() => {
 .animate-progress-indeterminate {
   position: relative;
   animation: progress-indeterminate 1.5s infinite linear;
+}
+
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s ease;
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
 }
 </style>
