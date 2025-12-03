@@ -201,56 +201,101 @@ class InspectionController extends Controller
     }
 
     public function bulkPass(Request $request) 
-    {
-        $lotsData = $request->input('lots', []); 
-        $requestPlant = $request->input('plant'); 
-        if (empty($requestPlant)) {
-            return response()->json(['status' => 'error', 'message' => 'Plant wajib dikirim.'], 400);
-        }
-        $udConfig = [];
-        if (in_array($requestPlant, ['3000', '1000', '1001'])) {
-            $udConfig = ['plant' => '1000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'Z1', 'ud_code' => 'A'];
-        } else if ($requestPlant == '2000') {
-            $udConfig = ['plant' => '2000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'ZI', 'ud_code' => 'A'];
-        } else {
-            return response()->json(['status' => 'error', 'message' => "Plant {$requestPlant} tidak valid."], 400);
-        }
-        $sapUsername = '';
-        $sapPassword = '';
-        $sapNik      = '';
+{
+    $lotsData = $request->input('lots', []); 
+    $requestPlant = $request->input('plant'); 
 
-        try {
-            $sessionId = request()->session()->getId();
-            $redisKey = "sap_session:{$sessionId}";
+    // --- VALIDASI PLANT ---
+    if (empty($requestPlant)) {
+        return response()->json(['status' => 'error', 'message' => 'Plant wajib dikirim.'], 400);
+    }
+    $udConfig = [];
+    if (in_array($requestPlant, ['3000', '1000', '1001'])) {
+        $udConfig = ['plant' => '1000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'Z1', 'ud_code' => 'A'];
+    } else if ($requestPlant == '2000') {
+        $udConfig = ['plant' => '2000', 'ud_code_group' => 'ZI', 'ud_selected_set' => 'ZI', 'ud_code' => 'A'];
+    } else {
+        return response()->json(['status' => 'error', 'message' => "Plant {$requestPlant} tidak valid."], 400);
+    }
 
-            if (Redis::exists($redisKey)) {
-                $decrypted = Crypt::decryptString(
-                    Redis::get($redisKey)
-                );
-                $sess = json_decode($decrypted, true);
-                $sapUsername = $sess['username'] ?? '';
-                $sapPassword = $sess['password'] ?? '';
-                $sapNik      = $sess['nik'] ?? ''; 
-            }
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => 'Sesi Redis Error.'], 401);
-        }
+    // --- AMBIL SESI DARI REDIS ---
+    $sapUsername = '';
+    $sapPassword = '';
+    $sapNik      = '';
 
-        if (empty($sapUsername) || empty($sapPassword) || empty($sapNik)) {
-            return response()->json(['status' => 'error', 'message' => 'Sesi Invalid (NIK/Pass kosong). Login ulang.'], 401);
+    try {
+        $sessionId = request()->session()->getId();
+        $redisKey = "sap_session:{$sessionId}";
+
+        if (Redis::exists($redisKey)) {
+            $decrypted = Crypt::decryptString(Redis::get($redisKey));
+            $sess = json_decode($decrypted, true);
+            $sapUsername = $sess['username'] ?? '';
+            $sapPassword = $sess['password'] ?? '';
+            $sapNik      = $sess['nik'] ?? ''; 
         }
+    } catch (\Exception $e) {
+        return response()->json(['status' => 'error', 'message' => 'Sesi Redis Error.'], 401);
+    }
+
+    if (empty($sapUsername) || empty($sapPassword) || empty($sapNik)) {
+        return response()->json(['status' => 'error', 'message' => 'Sesi Invalid (NIK/Pass kosong). Login ulang.'], 401);
+    }
+    
+    // --- STREAM RESPONSE ---
+    return response()->stream(function () use ($lotsData, $requestPlant, $udConfig, $sapUsername, $sapPassword, $sapNik) {
+        $sapBaseUrl = config('services.sap.url'); // Pastikan config ini mengarah ke port Node.js kamu (4003)
         
-        return response()->stream(function () use ($lotsData, $requestPlant, $udConfig, $sapUsername, $sapPassword, $sapNik) {
-            $sapBaseUrl = config('services.sap.url');
-            foreach ($lotsData as $lotRaw) {
-                $lot = (object) $lotRaw; 
-                $lotNumber = $lot->PRUEFLOS ?? null;
-                if (!$lotNumber) continue; 
-                
-                $status = 'ERROR';
-                $message = 'Unknown Error';
+        foreach ($lotsData as $lotRaw) {
+            $lot = (object) $lotRaw; 
+            $lotNumber = $lot->PRUEFLOS ?? null;
+            if (!$lotNumber) continue; 
+            
+            $status = 'ERROR';
+            $message = 'Unknown Error';
+            
+            // Flag untuk menentukan apakah boleh lanjut ke UD
+            $proceedToUd = true; 
 
-                // 1. Eksekusi ke SAP
+            // --- [BARU] CEK STATUS TECO/REL ---
+            $stats = $lot->STATS ?? '';
+            // Cek apakah string mengandung TECO dan REL
+            $isTecoRel = (strpos($stats, 'TECO') !== false) && (strpos($stats, 'REL') !== false);
+
+            if ($isTecoRel) {
+                // Lakukan Un-TECO terlebih dahulu
+                try {
+                    $untecoPayload = [
+                        'username' => $sapUsername,
+                        'password' => $sapPassword,
+                        'aufnr'    => $lot->AUFNR ?? '' // Pastikan AUFNR ada
+                    ];
+
+                    // Panggil API Node.js yang baru kita buat
+                    $untecoResponse = Http::timeout(60)->post("{$sapBaseUrl}/api/unteco_production_order", $untecoPayload);
+                    $untecoData = $untecoResponse->json();
+
+                    if ($untecoResponse->successful() && ($untecoData['status'] ?? '') == 'success') {
+                        // Un-TECO Sukses, lanjut ke UD
+                        // Optional: Log keberhasilan Un-TECO jika perlu
+                    } else {
+                        // Un-TECO Gagal, blokir UD
+                        $proceedToUd = false;
+                        $status = 'ERROR';
+                        $message = "Gagal Un-TECO: " . ($untecoData['message'] ?? 'SAP Error saat Un-TECO');
+                    }
+
+                } catch (\Exception $e) {
+                    $proceedToUd = false;
+                    $status = 'ERROR';
+                    $message = "Exception Un-TECO: " . $e->getMessage();
+                }
+            }
+            // --- END LOGIC UN-TECO ---
+
+
+            // 1. Eksekusi UD ke SAP (Hanya jika proceedToUd TRUE)
+            if ($proceedToUd) {
                 try {
                     $payload = [
                         'prueflos'        => $lotNumber,
@@ -270,6 +315,11 @@ class InspectionController extends Controller
                     if ($response->successful() && ($resData['status'] ?? '') == 'success') {
                         $status = 'SUCCESS';
                         $message = $resData['message'] ?? 'Posted';
+                        
+                        // Jika tadi melakukan Un-TECO, tambahkan info ke pesan
+                        if ($isTecoRel) {
+                            $message .= " (Auto Un-TECO Success)";
+                        }
                     } else {
                         $status = 'ERROR';
                         $message = $resData['message'] ?? 'SAP Error';
@@ -279,60 +329,60 @@ class InspectionController extends Controller
                     $status = 'ERROR';
                     $message = $e->getMessage();
                 }
-
-                // 2. Simpan ke Database (Update Or Create)
-                try {
-                    // Cek berdasarkan 'prueflos', jika ada update, jika tidak create.
-                    HistoryQualityManagement::updateOrCreate(
-                        ['prueflos' => $lotNumber], // Kunci pencarian (Unique Key)
-                        [
-                            'plant'              => $requestPlant,
-                            'order_number'       => $lot->AUFNR ?? null,
-                            'material_code'      => $lot->MATNR ?? null,
-                            'material_desc'      => $lot->KTEXTMAT ?? null,
-                            'batch'              => $lot->CHARG ?? null,
-                            'quantity'           => $lot->LOSMENGE ?? 0,
-                            'uom'                => $lot->MENGENEINH ?? null,
-                            'sales_order'        => $lot->KDAUF ?? null,
-                            'sales_item'         => isset($lot->KDPOS) ? ltrim($lot->KDPOS, '0') : null, 
-                            'buyer_name'         => $lot->NAME1 ?? null,
-                            'customer_po'        => $lot->BSTNK ?? null,
-                            'inspector_sap_id'   => $sapUsername, 
-                            'inspector_nik'      => $sapNik,                  
-                            'ud_code'            => $udConfig['ud_code'],
-                            'ud_selected_set'    => $udConfig['ud_selected_set'],
-                            'status'             => $status, // Status terbaru dari SAP
-                            'sap_message'        => $message, // Pesan terbaru
-                            'full_lot_snapshot'  => $lotRaw // Snapshot data terbaru
-                        ]
-                    );
-
-                } catch (\Exception $dbEx) {
-                    Log::error("DB Save Fail Lot {$lotNumber}: " . $dbEx->getMessage());
-                }
-                
-                // 3. Kirim respon streaming ke Client
-                echo json_encode([
-                    'lot' => $lotNumber,
-                    'status' => $status,
-                    'message' => $message
-                ]) . "\n";
-
-                if (ob_get_level() > 0) ob_flush();
-                flush();
             }
 
-            // Tanda Selesai
-            echo json_encode(['status' => 'DONE']) . "\n";
+            // 2. Simpan ke Database (History)
+            try {
+                HistoryQualityManagement::updateOrCreate(
+                    ['prueflos' => $lotNumber], 
+                    [
+                        'plant'              => $requestPlant,
+                        'order_number'       => $lot->AUFNR ?? null,
+                        'material_code'      => $lot->MATNR ?? null,
+                        'material_desc'      => $lot->KTEXTMAT ?? null,
+                        'batch'              => $lot->CHARG ?? null,
+                        'quantity'           => $lot->LOSMENGE ?? 0,
+                        'uom'                => $lot->MENGENEINH ?? null,
+                        'sales_order'        => $lot->KDAUF ?? null,
+                        'sales_item'         => isset($lot->KDPOS) ? ltrim($lot->KDPOS, '0') : null, 
+                        'buyer_name'         => $lot->NAME1 ?? null,
+                        'customer_po'        => $lot->BSTNK ?? null,
+                        'inspector_sap_id'   => $sapUsername, 
+                        'inspector_nik'      => $sapNik,                  
+                        'ud_code'            => $udConfig['ud_code'],
+                        'ud_selected_set'    => $udConfig['ud_selected_set'],
+                        'status'             => $status, 
+                        'sap_message'        => $message, 
+                        'full_lot_snapshot'  => $lotRaw 
+                    ]
+                );
+
+            } catch (\Exception $dbEx) {
+                Log::error("DB Save Fail Lot {$lotNumber}: " . $dbEx->getMessage());
+            }
+            
+            // 3. Kirim respon streaming ke Client
+            echo json_encode([
+                'lot' => $lotNumber,
+                'status' => $status,
+                'message' => $message
+            ]) . "\n";
+
             if (ob_get_level() > 0) ob_flush();
             flush();
+        }
 
-        }, 200, [
-            'Content-Type' => 'application/x-ndjson',
-            'X-Accel-Buffering' => 'no',
-            'Cache-Control' => 'no-cache',
-        ]);
-    }
+        // Tanda Selesai
+        echo json_encode(['status' => 'DONE']) . "\n";
+        if (ob_get_level() > 0) ob_flush();
+        flush();
+
+    }, 200, [
+        'Content-Type' => 'application/x-ndjson',
+        'X-Accel-Buffering' => 'no',
+        'Cache-Control' => 'no-cache',
+    ]);
+}
 
     public function store(Request $request)
     {

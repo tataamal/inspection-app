@@ -58,22 +58,29 @@ const getStatusConfig = (stats) => {
     if (!stats) return { class: 'bg-slate-500/20 text-slate-400', label: 'N/A', action: 'unknown' };
     
     const s = stats.trim();
-    if (s.includes('REL') && s.includes('REL')) {
+    if (s.includes('TECO') && s.includes('REL')) {
         return { class: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20', label: s, action: 'allow' };
     }
-    if (s.includes('TECO') || (s.includes('UD') && !s.includes('REL'))) { 
-        return { class: 'bg-rose-500/20 text-rose-400 border border-rose-500/20', label: s, action: 'block_teco' };
+
+    if (s.includes('REL') && !s.includes('UD')) {
+        return { class: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20', label: s, action: 'allow' };
     }
+
     if (s.includes('REL') && s.includes('UD')) {
         return { class: 'bg-amber-500/20 text-amber-400 border border-amber-500/20', label: s, action: 'block_rel_ud' };
     }
+
+    if (s.includes('TECO') || (s.includes('UD') && !s.includes('REL'))) { 
+        return { class: 'bg-rose-500/20 text-rose-400 border border-rose-500/20', label: s, action: 'block_teco' };
+    }
+
     if (s.includes('CRTD')) {
         return { class: 'bg-blue-500/20 text-blue-400 border border-blue-500/20', label: s, action: 'block_crtd' };
     }
+
     return { class: 'bg-slate-500/20 text-slate-400', label: s, action: 'unknown' };
 };
 
-// --- 2. HANDLER TOMBOL INSPECT ---
 const handleInspect = (lot) => {
     // Cek Lock Tanggal 1
     if (isMonthlyLocked.value) {

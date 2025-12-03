@@ -1,0 +1,21 @@
+
+**** Log file opened at 2025-12-03 01:51:13.580378 UTC+07:00 (SE Asia Standard Time), Encoding UTF-8
+NW RFC Library: SDK variant, Release 750 Patch Level 15
+Compilation date          : Nov  1 2024 23:51:57
+CPIC library              : 754.2024.07.29 version 3
+NI library                : 40
+Kernel Release            : 754 Patch Level 419
+Current working directory : D:\inspection-app
+Program                   : python
+Process ID                : 27540
+User                      : Niltal Amal
+Hardware                  : PC with Windows NT 12x AMD64 Level 25 (Mod 68 Step 1)
+Binary Type               : 64bit
+Operating_system          : Windows NT 10.0
+Hostname                  : DESKTOP-2KBS7NQ
+IP address                : 192.168.0.238
+IPv6 address              : fe80::cd88:8545:4bfb:691
+Global trace level        : 0
+
+2025-12-03 01:51:13.580446 [17496] >> Info entry
+	Did not find config file D:\inspection-app\sapnwrfc.ini.
