@@ -148,16 +148,21 @@ class DashboardController extends Controller
         }
 
         // B. Terapkan Filter (Search, Date, Status) di Server Side
-        // Ini PENTING karena pagination hanya mengambil sebagian data.
         $this->applyFilters($query, $request);
 
-        // C. Eksekusi Pagination (10 per halaman)
+        // ==========================================================
+        // POINT UTAMA: Hitung Total Qty (Hanya Status SUCCESS)
+        // Kita clone query agar filternya terbawa, tapi tidak merusak pagination
+        // ==========================================================
+        $qtyQuery = clone $query;
+        $totalQty = $qtyQuery->where('status', 'SUCCESS')->sum('quantity');
+
+        // C. Eksekusi Pagination (6 per halaman)
         $historyList = $query->orderBy('created_at', 'desc')
                              ->paginate(6)
-                             ->withQueryString(); // Agar parameter filter tetap ada saat klik page 2, 3, dst
+                             ->withQueryString(); 
 
-        // D. Transformasi Data (Menambah atribut 'section')
-        // Gunakan 'through' untuk memodifikasi items di dalam paginator
+        // D. Transformasi Data
         $historyList->through(function ($item) {
             $item->section = $this->determineSection($item);
             return $item;
@@ -170,8 +175,9 @@ class DashboardController extends Controller
                 'role'     => $userData['role'] ?? 'user'
             ],
             'mrpList' => $myMrpList,
-            'historyList' => $historyList, // Sekarang bentuknya Object Paginator (data, links, meta), bukan Array flat
-            'filters' => $request->all(['search', 'status', 'section', 'startDate', 'endDate']) // Kirim balik state filter ke frontend
+            'historyList' => $historyList,
+            'totalQty' => (float) $totalQty, // Kirim ke Vue sebagai Number
+            'filters' => $request->all(['search', 'status', 'section', 'startDate', 'endDate'])
         ]);
     }
 
@@ -194,20 +200,23 @@ class DashboardController extends Controller
 
         $query = DB::table('history_quality_management');
 
-        // ============================================================
-        // PENTING: Panggil Helper applyFilters disini!
-        // Jangan menulis ulang logika filter manual yang menyebabkan bug parameter.
-        // Helper ini sudah menangani 'startDate' (Vue) vs 'start_date'.
-        // ============================================================
+        // Terapkan Filter yang sama persis
         $this->applyFilters($query, $request);
 
-        // Ambil data (tanpa limit/paginate untuk export)
+        // Ambil data
         $historyData = $query->orderBy('created_at', 'desc')->get();
         
+        // Transform Data
         $historyData->transform(function($item) {
             $item->section = $this->determineSection($item);
             return $item;
         });
+
+        // ==========================================================
+        // POINT UTAMA: Hitung Total Qty untuk PDF
+        // Hitung dari collection yang sudah ditarik (agar hemat query DB)
+        // ==========================================================
+        $totalQty = $historyData->where('status', 'SUCCESS')->sum('quantity');
 
         // Kolom Sembunyi
         $hiddenColumns = [];
@@ -221,10 +230,10 @@ class DashboardController extends Controller
         $pdf = Pdf::loadView('reports.history_qm_pdf', [
             'data' => $historyData,
             'user' => $userData,
+            'total_qty' => $totalQty, // Kirim ke View PDF
             'generated_at' => Carbon::now()->format('d F Y, H:i:s'),
             'logo_path' => public_path('images/KMI.png'),
             'filters' => [
-                // Kirim parameter yang ada (bisa startDate atau start_date) untuk label di PDF
                 'start' => $request->startDate ?? $request->start_date,
                 'end' => $request->endDate ?? $request->end_date,
                 'status' => $request->status,

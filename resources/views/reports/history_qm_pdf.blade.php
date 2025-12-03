@@ -61,9 +61,27 @@
             text-align: center;
             font-size: 7.5pt;
             color: #333333; /* Sedikit lebih gelap */
-            margin-bottom: 12px;
+            margin-bottom: 5px;
             font-weight: bold;
             font-style: italic;
+        }
+
+        /* --- SUMMARY BOX --- */
+        .summary-box {
+            text-align: right;
+            margin-bottom: 10px;
+            font-size: 8pt;
+        }
+        .summary-item {
+            display: inline-block;
+            margin-left: 15px;
+            font-weight: bold;
+        }
+        .summary-value {
+            border: 1px solid #000;
+            padding: 2px 6px;
+            background-color: #f3f4f6;
+            margin-left: 5px;
         }
 
         /* --- TABLE --- */
@@ -155,6 +173,16 @@
         @if($filters['status']) [ Status: {{ $filters['status'] }} ] @endif
         @if($filters['section']) [ Bagian: {{ $filters['section'] }} ] @endif
         @if($filters['search']) [ Search: "{{ $filters['search'] }}" ] @endif
+    </div>
+
+    <!-- SUMMARY SECTION (BARU) -->
+    <div class="summary-box">
+        <div class="summary-item">
+            Total Data: <span class="summary-value">{{ count($data) }}</span>
+        </div>
+        <div class="summary-item">
+            Total Qty (SUCCESS): <span class="summary-value" style="background-color: #d1fae5; border-color: #059669;">{{ number_format($total_qty ?? 0, 0, ',', '.') }}</span>
+        </div>
     </div>
 
     <table class="data-table">
