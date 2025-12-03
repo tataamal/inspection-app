@@ -178,9 +178,6 @@
     <!-- SUMMARY SECTION (BARU) -->
     <div class="summary-box">
         <div class="summary-item">
-            Total Data: <span class="summary-value">{{ count($data) }}</span>
-        </div>
-        <div class="summary-item">
             Total Qty (SUCCESS): <span class="summary-value" style="background-color: #d1fae5; border-color: #059669;">{{ number_format($total_qty ?? 0, 0, ',', '.') }}</span>
         </div>
     </div>
