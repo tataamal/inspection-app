@@ -509,4 +509,105 @@ class InspectionController extends Controller
             return redirect()->back()->withErrors(['message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
         }
     }
+    public function simulate(Request $request)
+    {
+        $validated = $request->validate([
+            'pro' => [
+                'nullable', 
+                'string', 
+                'regex:/^[0-9; ]+$/', // Allow spaces
+                'required_without:mrp'
+            ],
+            'mrp' => [
+                'nullable', 
+                'string',
+                'required_without:pro'
+            ],
+        ], [
+            'pro.regex' => 'Format PRO tidak valid. Hanya angka, spasi, dan titik koma (;) yang diperbolehkan.',
+            'pro.required_without' => 'PRO wajib diisi jika MRP kosong.',
+            'mrp.required_without' => 'MRP wajib diisi jika PRO kosong.',
+        ]);
+
+        if (!empty($validated['pro']) && !empty($validated['mrp'])) {
+            return back()->withErrors(['message' => 'Hanya boleh mengisi salah satu (PRO atau MRP).']);
+        }
+
+        // Parse Data & Construct Payload
+        $payload = [
+            'username' => env('SAP_API_USERNAME', 'auto_email'),
+            'password' => env('SAP_API_PASSWORD', '11223344'), 
+            'values'   => []
+        ];
+        $typeLabel = '';
+
+        if (!empty($validated['pro'])) {
+            $payload['type'] = 'PRO';
+            $typeLabel = 'Production Order (PRO)';
+            // Replace spaces with semicolons, then split by semicolon
+            $raw = str_replace(' ', ';', $validated['pro']);
+            $items = explode(';', $raw);
+            $payload['values'] = array_values(array_filter($items, fn($value) => !is_null($value) && trim($value) !== ''));
+        } else {
+            $payload['type'] = 'MRP';
+            $typeLabel = 'MRP Controller';
+            $raw = str_replace(' ', ';', $validated['mrp']);
+            $items = explode(';', $raw);
+            $payload['values'] = array_values(array_filter($items, fn($value) => !is_null($value) && trim($value) !== ''));
+        }
+
+        try {
+            $apiUrl = env('SAP_API_URL') . '/api/get_data_inspect_oper';
+            $response = Http::timeout(3600)->post($apiUrl, $payload); // Long timeout for MRP
+
+            if ($response->successful()) {
+                $json = $response->json();
+                
+                if (($json['status'] ?? '') === 'success') {
+                    $mappedData = collect($json['data'] ?? [])->map(function ($item) {
+                        return [
+                            'PERNR' => $item['PERNR'] ?? '-',
+                            'AUFNR' => $item['AUFNR'] ?? '-',
+                            'MAKTX' => $item['MAKTX'] ?? '-',
+                            'QTY'   => (float)($item['GMNGA'] ?? 0),
+                            'UOM'   => ($item['GMEIN'] ?? '') === 'ST' ? 'PC' : ($item['GMEIN'] ?? ''),
+                            'BUDAT' => isset($item['BUDAT']) ? date('d-m-Y', strtotime($item['BUDAT'])) : '-',
+                            // Hidden fields
+                            'RUECK' => $item['RUECK'] ?? null,
+                            'RMZHL' => $item['RMZHL'] ?? null
+                        ];
+                    });
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Data ditemukan.',
+                        'data' => [
+                            'type'  => $typeLabel,
+                            'count' => $mappedData->count(),
+                            'items' => $mappedData
+                        ]
+                    ]);
+                } else {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'API SAP Error: ' . ($json['message'] ?? 'Unknown Error'),
+                        'errors' => $json['errors'] ?? null
+                    ], 400);
+                }
+
+            } else {
+                return response()->json([
+                    'status' => 'error', 
+                    'message' => 'Gagal menghubungi server SAP. HTTP ' . $response->status()
+                ], $response->status());
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Inspection Simulation Error: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error', 
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -39,6 +39,16 @@ const isAdmin = computed(() => {
     return props.authUser?.role === 'admin';
 });
 
+// CHECK DATE > 25
+const isAfter25th = computed(() => {
+    const d = new Date();
+    return d.getDate() > 25;
+});
+
+const goToInspectionOperation = () => {
+    router.visit('/inspection-operation');
+};
+
 // --- LOGIC MRP (USER BIASA) ---
 const filteredMrp = computed(() => {
     if (!searchQuery.value) return props.mrpList;
@@ -495,6 +505,18 @@ const getStatusColor = (status) => {
                             <div class="flex flex-col text-left">
                                 <span class="text-3xl font-extrabold text-white leading-none">{{ props.historyList.total || 0 }}</span>
                                 <span class="text-sm font-medium mt-1" :class="viewMode === 'history' ? 'text-indigo-400' : 'text-slate-400'">Riwayat Saya</span>
+                            </div>
+                        </div>
+
+                        <!-- NEW CARD: INSPECTION OPERATION (ONLY AFTER 25th) -->
+                        <div v-if="isAfter25th" @click="goToInspectionOperation"
+                             class="group min-w-[220px] bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 flex items-center gap-4 cursor-pointer transition-all duration-300 active:scale-95 hover:bg-white/10">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors bg-sky-500/20 text-sky-400 group-hover:text-sky-300">
+                                <i class="fa-solid fa-clipboard-check"></i>
+                            </div>
+                            <div class="flex flex-col text-left">
+                                <span class="text-xl font-extrabold text-white leading-none">Operation</span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-sky-400 mt-1">Inspeksi</span>
                             </div>
                         </div>
                     </div>
