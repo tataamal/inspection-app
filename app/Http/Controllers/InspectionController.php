@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\HistoryQualityManagement;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\HistorySubmitQm;
 
 
 class InspectionController extends Controller
@@ -609,5 +610,105 @@ class InspectionController extends Controller
                 'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
+    }
+    public function submitQm(Request $request)
+    {
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.rueck' => 'required',
+            'items.*.rmzhl' => 'required',
+        ]);
+
+        $sessionId = $request->session()->getId();
+        $sapCreds = [];
+        if (Redis::exists("sap_session:{$sessionId}")) {
+            $decrypted = Crypt::decryptString(Redis::get("sap_session:{$sessionId}"));
+            $sapCreds = json_decode($decrypted, true);
+        }
+
+        $username = $sapCreds['username'] ?? 'unknown';
+        $password = $sapCreds['password'] ?? '';
+        
+        $payload = [
+            'items' => $request->input('items'),
+            'username' => $username,
+            'password' => $password
+        ];
+
+        return response()->stream(function () use ($payload, $username) {
+             $sapBaseUrl = config('services.sap.url'); 
+             $url = "{$sapBaseUrl}/api/submit_qm_stream";
+
+             $client = new \GuzzleHttp\Client();
+             try {
+                 $response = $client->post($url, [
+                     'json' => $payload,
+                     'stream' => true,
+                     'timeout' => 300 
+                 ]);
+                 
+                 $body = $response->getBody();
+                 $buffer = '';
+
+                 while (!$body->eof()) {
+                     $chunk = $body->read(1024);
+                     $buffer .= $chunk;
+                     
+                     while (($newline = strpos($buffer, "\n")) !== false) {
+                         $line = substr($buffer, 0, $newline);
+                         $buffer = substr($buffer, $newline + 1);
+                         
+                         if (trim($line)) {
+                             $data = json_decode($line, true);
+                             
+                             // Log to DB
+                             if (isset($data['rueck'])) {
+                                  try {
+                                      // Extract AUFNR/MAKTX/BUDAT from SAP Data if available
+                                      // Assuming T_DATA1 (data) is an array of objects
+                                      $sapData = $data['data'] ?? [];
+                                      if (is_array($sapData) && count($sapData) > 0) {
+                                          $sapItem = $sapData[0]; // Take first item
+                                      } else {
+                                          $sapItem = [];
+                                      }
+
+                                      HistorySubmitQm::create([
+                                          'username' => $username,
+                                          'process_date' => now(),
+                                          'aufnr' => $sapItem['AUFNR'] ?? null,
+                                          'maktx' => $sapItem['MAKTX'] ?? null,
+                                          'rueck' => $data['rueck'] ?? null,
+                                          'rmzhl' => $data['rmzhl'] ?? null,
+                                          'budat' => isset($sapItem['BUDAT']) ? date('Y-m-d', strtotime($sapItem['BUDAT'])) : null,
+                                          'status' => $data['status'] ?? 'unknown',
+                                          'message' => $data['message'] ?? ''
+                                      ]);
+                                  } catch (\Exception $e) {
+                                      Log::error("Failed to log submit QM: " . $e->getMessage());
+                                  }
+                             }
+
+                             echo $line . "\n";
+                             if (ob_get_level() > 0) ob_flush();
+                             flush();
+                         }
+                     }
+                 }
+             } catch (\Exception $e) {
+                 echo json_encode(['status' => 'critical_error', 'message' => $e->getMessage()]) . "\n";
+                 Log::error("Stream Proxy Error: " . $e->getMessage());
+             }
+
+             // Tanda Selesai
+             echo json_encode(['status' => 'DONE']) . "\n";
+             if (ob_get_level() > 0) ob_flush();
+             flush();
+
+        }, 200, [
+            'Content-Type' => 'application/x-ndjson',
+            'X-Accel-Buffering' => 'no',
+            'Cache-Control' => 'no-cache',
+        ]);
     }
 }

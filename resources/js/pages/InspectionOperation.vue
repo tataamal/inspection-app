@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, watch, ref, computed, onMounted, onUnmounted } from 'vue';
+import { reactive, watch, ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { Head, router, Link } from '@inertiajs/vue3'; 
 import Swal from 'sweetalert2';
 import axios from 'axios';
@@ -19,6 +19,11 @@ let abortController = null;
 let removeGuard = null;
 const isFormExpanded = ref(true);
 const selectedItems = ref([]);
+const showProgressModal = ref(false);
+const isProcessingSubmit = ref(false);
+const progressLogs = ref([]);
+const progressStats = ref({ success: 0, fail: 0, total: 0 });
+const logContainerRef = ref(null);
 
 // Watch input changes to enforce numeric + semicolon + space only for PRO
 watch(() => form.pro, (newVal) => {
@@ -28,16 +33,45 @@ watch(() => form.pro, (newVal) => {
     }
 });
 
-// Computed for Select All
+
+const searchQuery = ref('');
+
+// Computed for Filtered Items
+const filteredItems = computed(() => {
+    if (!simulatedData.value?.items) return [];
+    
+    // Inject original index if not present (handled in submit, but safety here)
+    // NOTE: Ideally done once on fetch.
+    
+    if (!searchQuery.value) return simulatedData.value.items;
+    
+    const lowerQ = searchQuery.value.toLowerCase();
+    return simulatedData.value.items.filter(item => {
+        return Object.values(item).some(val => 
+            String(val).toLowerCase().includes(lowerQ)
+        );
+    });
+});
+
+// Computed for Select All (Based on Filtered Items)
 const isAllSelected = computed(() => {
-    return simulatedData.value?.items?.length > 0 && selectedItems.value.length === simulatedData.value.items.length;
+    const items = filteredItems.value;
+    return items.length > 0 && items.every(item => selectedItems.value.includes(item._originalIndex));
 });
 
 const toggleSelectAll = () => {
+    const items = filteredItems.value;
+    if (items.length === 0) return;
+
     if (isAllSelected.value) {
-        selectedItems.value = [];
+        // Unselect all VISIBLE items
+        const idsToRemove = items.map(i => i._originalIndex);
+        selectedItems.value = selectedItems.value.filter(id => !idsToRemove.includes(id));
     } else {
-        selectedItems.value = simulatedData.value.items.map((_, index) => index);
+        // Select all VISIBLE items
+        const idsToAdd = items.map(i => i._originalIndex);
+        // Use Set to prevent duplicates
+        selectedItems.value = [...new Set([...selectedItems.value, ...idsToAdd])];
     }
 };
 
@@ -71,7 +105,7 @@ const submitQM = async () => {
     });
     htmlContent += '</div>';
 
-    await Swal.fire({
+    const result = await Swal.fire({
         title: 'Konfirmasi Submit QM',
         html: htmlContent,
         icon: 'info',
@@ -86,6 +120,189 @@ const submitQM = async () => {
             popup: 'border border-emerald-500/30 shadow-2xl'
         }
     });
+
+    if (result.isConfirmed) {
+        await processSubmitQM(selectedData);
+    }
+};
+
+const getXsrfToken = () => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; XSRF-TOKEN=`);
+    if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+    return null;
+};
+
+const processSubmitQM = async (items) => {
+    isProcessingSubmit.value = true;
+    showProgressModal.value = true;
+    progressLogs.value = [];
+    progressStats.value = { success: 0, fail: 0, total: items.length };
+
+    const payloadItems = items.map(item => ({
+        rueck: item.RUECK,
+        rmzhl: item.RMZHL
+    }));
+
+    try {
+        const xsrfToken = getXsrfToken();
+        const response = await fetch('/inspection-operation/submit', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': xsrfToken,
+                'Accept': 'application/x-ndjson'
+            },
+            body: JSON.stringify({ items: payloadItems })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+                    
+                    if (data.status === 'DONE') {
+                         if (isProcessingSubmit.value) {
+                             isProcessingSubmit.value = false;
+                             
+                             // Remove success items from simulatedData
+                             if (simulatedData.value && simulatedData.value.items) {
+                                 const successKeys = new Set(
+                                     progressLogs.value
+                                         .filter(l => l.statusLabel === 'SUCCESS')
+                                         .map(l => `${l.rueck}_${l.rmzhl}`)
+                                 );
+                                 
+                                 if (successKeys.size > 0) {
+                                      simulatedData.value.items = simulatedData.value.items.filter(item => {
+                                          const key = `${item.RUECK}_${item.RMZHL}`;
+                                          return !successKeys.has(key);
+                                      });
+                                      if (simulatedData.value.count) {
+                                          simulatedData.value.count = simulatedData.value.items.length;
+                                      }
+                                      selectedItems.value = []; // Clear selection immediately to prevent index mismatch
+                                 }
+                             }
+
+                             // Auto close after 2 seconds
+                             setTimeout(() => {
+                                 closeProgressModal();
+                                 Swal.fire({
+                                     icon: 'success',
+                                     title: 'Selesai!',
+                                     text: 'Semua data berhasil diproses.',
+                                     timer: 1500,
+                                     showConfirmButton: false
+                                 });
+                             }, 2000);
+                         }
+                    } else if (data.status === 'critical_error') {
+                        throw new Error(data.message);
+                    } else {
+                        // Find original local item to display nice info
+                        const originalItem = items.find(i => i.RUECK === data.rueck && i.RMZHL === data.rmzhl);
+                        const logEntry = {
+                            ...data,
+                            AUFNR: originalItem ? originalItem.AUFNR : 'Unknown',
+                            MAKTX: originalItem ? originalItem.MAKTX : 'Unknown',
+                            statusLabel: data.status === 'success' || data.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED'
+                        };
+                        
+                        progressLogs.value.push(logEntry);
+                        
+                        if (logEntry.statusLabel === 'SUCCESS') progressStats.value.success++;
+                        else progressStats.value.fail++;
+
+                        await nextTick();
+                        if (logContainerRef.value) {
+                            logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
+                        }
+                    }
+                } catch (e) {
+                    console.error("JSON Parse Error", e);
+                }
+            }
+        }
+
+        
+        // Flush decoder and process remaining buffer
+        buffer += decoder.decode();
+        
+        if (buffer && buffer.trim()) {
+             try {
+                 const data = JSON.parse(buffer);
+                 if (data.status === 'DONE') {
+                     if (isProcessingSubmit.value) {
+                         isProcessingSubmit.value = false;
+                         
+                         // Remove success items from simulatedData
+                         if (simulatedData.value && simulatedData.value.items) {
+                             const successKeys = new Set(
+                                 progressLogs.value
+                                     .filter(l => l.statusLabel === 'SUCCESS')
+                                     .map(l => `${l.rueck}_${l.rmzhl}`)
+                             );
+                             
+                             if (successKeys.size > 0) {
+                                  simulatedData.value.items = simulatedData.value.items.filter(item => {
+                                      const key = `${item.RUECK}_${item.RMZHL}`;
+                                      return !successKeys.has(key);
+                                  });
+                                  // Update total count if needed, or just let it be
+                                  if (simulatedData.value.count) {
+                                      simulatedData.value.count = simulatedData.value.items.length;
+                                  }
+                                  selectedItems.value = []; // Clear selection immediately to prevent index mismatch
+                             }
+                         }
+                         
+                         // Auto close after 2 seconds
+                         setTimeout(() => {
+                             closeProgressModal();
+                             Swal.fire({
+                                 icon: 'success',
+                                 title: 'Selesai!',
+                                 text: 'Semua data berhasil diproses.',
+                                 timer: 1500,
+                                 showConfirmButton: false
+                             });
+                         }, 2000);
+                     }
+                 } else if (data.status === 'critical_error') {
+                        throw new Error(data.message);
+                 }
+             } catch(e) { console.error("Final Buffer JSON Parse Error", e); }
+        }
+    } catch (e) {
+        progressLogs.value.push({
+            status: 'error',
+            message: `System Error: ${e.message}`,
+            AUFNR: 'SYSTEM',
+            MAKTX: '-'
+        });
+        isProcessingSubmit.value = false;
+    }
+};
+
+const closeProgressModal = () => {
+    if (!isProcessingSubmit.value) {
+        showProgressModal.value = false;
+        // Optional: Refresh data or clear selection
+        selectedItems.value = [];
+    }
 };
 
 const submit = async () => {
@@ -123,7 +340,14 @@ const submit = async () => {
         });
         
         if (response.data.status === 'success') {
-            simulatedData.value = response.data.data;
+            const resultData = response.data.data;
+            
+            // Inject distinct original index for consistent selection even when filtered
+            if (resultData.items) {
+                resultData.items = resultData.items.map((item, idx) => ({ ...item, _originalIndex: idx }));
+            }
+
+            simulatedData.value = resultData;
             isFormExpanded.value = false; // Collapse form on success
             
             Swal.fire({
@@ -403,15 +627,41 @@ const logout = () => {
             <!-- RESULT TABLE SECTION (REAL API DATA) -->
             <transition enter-active-class="transition duration-500 ease-out" enter-from-class="opacity-0 translate-y-10" enter-to-class="opacity-100 translate-y-0">
                 <div v-if="simulatedData && simulatedData.count > 0" class="max-w-[1600px] mx-auto animate-fade-in-up">
-                    <div class="flex items-center justify-between mb-4 px-2">
-                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-list-check text-emerald-500"></i>
-                            Hasil Pencarian
-                            <span class="text-sm font-normal text-slate-400 font-mono">({{ simulatedData.type }})</span>
-                        </h2>
-                        <span class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full">
-                            {{ simulatedData.count }} Data Ditemukan
-                        </span>
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-2">
+                        
+                        <!-- TITLE & COUNT -->
+                        <div class="flex items-center justify-between md:justify-start gap-4 w-full md:w-auto">
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-emerald-500"></i>
+                                Hasil Pencarian
+                                <span class="hidden sm:inline text-sm font-normal text-slate-400 font-mono">({{ simulatedData.type }})</span>
+                            </h2>
+                            <span class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full whitespace-nowrap">
+                                {{ filteredItems.length }} / {{ simulatedData.count }} 
+                                <span class="hidden sm:inline">Data</span>
+                            </span>
+                        </div>
+
+                        <!-- SEARCH BAR -->
+                        <div class="relative w-full md:w-auto group">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-search text-slate-500 group-focus-within:text-emerald-500 transition-colors"></i>
+                            </div>
+                            <input 
+                                v-model="searchQuery" 
+                                type="text" 
+                                placeholder="Cari item (PRO, Deskripsi, dll)..." 
+                                class="block w-full md:w-80 pl-10 pr-4 py-2.5 bg-[#0f172a] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 focus:bg-[#162032] transition-all shadow-lg"
+                            >
+                            <!-- Clear Button -->
+                            <button 
+                                v-if="searchQuery"
+                                @click="searchQuery = ''"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white transition-colors"
+                            >
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="bg-[#162032]/50 rounded-2xl border border-white/5 pb-2 overflow-hidden shadow-xl">
@@ -437,19 +687,19 @@ const logout = () => {
                                 </thead>
                                 <tbody class="divide-y divide-white/5 text-sm">
                                     <tr 
-                                        v-for="(item, idx) in simulatedData.items" 
-                                        :key="idx" 
+                                        v-for="(item, idx) in filteredItems" 
+                                        :key="item._originalIndex" 
                                         class="hover:bg-white/5 transition-colors group cursor-pointer" 
-                                        :class="{ 'bg-emerald-500/5': selectedItems.includes(idx) }"
-                                        @click="toggleSelection(idx)"
+                                        :class="{ 'bg-emerald-500/5': selectedItems.includes(item._originalIndex) }"
+                                        @click="toggleSelection(item._originalIndex)"
                                     >
                                         <!-- CHECKBOX ROW -->
                                         <td class="py-4 px-4 text-center">
                                             <input 
                                                 type="checkbox" 
-                                                :checked="selectedItems.includes(idx)"
+                                                :checked="selectedItems.includes(item._originalIndex)"
                                                 class="w-4 h-4 rounded border-slate-600 bg-[#0f172a] text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
-                                                @click.stop="toggleSelection(idx)"
+                                                @click.stop="toggleSelection(item._originalIndex)"
                                             >
                                         </td>
                                         <td class="py-4 px-4">
@@ -515,6 +765,123 @@ const logout = () => {
                             Submit QM
                         </button>
                     </div>
+                </div>
+            </div>
+        </Transition>
+
+
+        <!-- PROGRESS MODAL -->
+        <Transition 
+            enter-active-class="transition duration-300 ease-out" 
+            enter-from-class="opacity-0 scale-95" 
+            enter-to-class="opacity-100 scale-100" 
+            leave-active-class="transition duration-200 ease-in" 
+            leave-from-class="opacity-100 scale-100" 
+            leave-to-class="opacity-0 scale-95"
+        >
+            <div v-if="showProgressModal" class="fixed inset-0 z-[120] flex items-center justify-center px-4">
+                <div class="absolute inset-0 bg-[#0B1120]/90 backdrop-blur-md"></div>
+                
+                <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ring-1 ring-white/10">
+                    
+                    <!-- HEADER -->
+                    <div class="p-6 bg-gradient-to-b from-[#1e293b] to-[#0f172a] border-b border-white/5 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-end mb-4">
+                                <div>
+                                    <h3 class="text-white font-bold text-xl flex items-center gap-2">
+                                        <i v-if="isProcessingSubmit" class="fa-solid fa-sync fa-spin text-emerald-400"></i>
+                                        <i v-else class="fa-solid fa-circle-check text-emerald-500"></i>
+                                        
+                                        {{ isProcessingSubmit ? 'Processing Submit QM...' : 'Process Completed' }}
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-1 font-mono">
+                                        {{ isProcessingSubmit ? 'Streaming data to SAP backend...' : 'All tasks finished.' }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-3xl font-black text-white tracking-tighter">
+                                        {{ progressStats.total > 0 ? Math.round(((progressStats.success + progressStats.fail) / progressStats.total) * 100) : 0 }}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="relative h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
+                                <div 
+                                    class="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                                    :style="{ width: `${progressStats.total > 0 ? ((progressStats.success + progressStats.fail) / progressStats.total) * 100 : 0}%` }"
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STATS GRID -->
+                    <div class="grid grid-cols-3 divide-x divide-white/5 border-b border-white/5 bg-[#162032]">
+                        <div class="p-4 text-center">
+                            <div class="text-[0.65rem] uppercase font-bold text-slate-500 tracking-wider mb-1">Total Items</div>
+                            <div class="text-xl font-bold text-white">{{ progressStats.total }}</div>
+                        </div>
+                        <div class="p-4 text-center bg-emerald-500/5">
+                            <div class="text-[0.65rem] uppercase font-bold text-emerald-500/80 tracking-wider mb-1">Success</div>
+                            <div class="text-xl font-bold text-emerald-400">{{ progressStats.success }}</div>
+                        </div>
+                        <div class="p-4 text-center bg-red-500/5">
+                            <div class="text-[0.65rem] uppercase font-bold text-red-500/80 tracking-wider mb-1">Failed</div>
+                            <div class="text-xl font-bold text-red-400">{{ progressStats.fail }}</div>
+                        </div>
+                    </div>
+
+                    <!-- LOG CONTAINER -->
+                    <div class="flex-1 overflow-y-auto bg-[#0B1120] relative scroll-smooth" ref="logContainerRef">
+                        <div class="p-4 space-y-2 relative z-10 font-mono text-sm">
+                            <TransitionGroup name="list">
+                                <div 
+                                    v-for="(log, idx) in progressLogs" 
+                                    :key="idx" 
+                                    class="flex items-start gap-3 p-3 rounded-lg border border-l-[3px] transition-all duration-300 bg-white/5" 
+                                    :class="log.statusLabel === 'SUCCESS' 
+                                        ? 'border-white/5 border-l-emerald-500' 
+                                        : 'border-white/5 border-l-red-500'"
+                                >
+                                    <div class="mt-0.5 shrink-0">
+                                        <i :class="log.statusLabel === 'SUCCESS' ? 'fa-solid fa-check text-emerald-500' : 'fa-solid fa-xmark text-red-500'"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex justify-between items-center mb-0.5">
+                                            <span class="font-bold text-slate-200 tracking-wide">{{ log.AUFNR || 'Unknown' }}</span>
+                                            <span class="text-[0.6rem] px-1.5 py-0.5 rounded bg-black/40 text-slate-400 border border-white/10">{{ log.statusLabel }}</span>
+                                        </div>
+                                        <div class="text-xs text-slate-400 mb-1 truncate">{{ log.MAKTX }}</div>
+                                        <p class="text-[0.7rem] text-slate-500 leading-relaxed break-words italic">{{ log.message }}</p>
+                                    </div>
+                                </div>
+                            </TransitionGroup>
+                        </div>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <div class="p-4 border-t border-white/5 bg-[#162032] flex justify-between items-center">
+                        <span class="text-xs text-slate-500 animate-pulse" v-if="isProcessingSubmit">
+                            Streaming data...
+                        </span>
+                        <span class="text-xs text-emerald-500 font-bold" v-else>
+                            <i class="fa-solid fa-thumbs-up mr-1"></i> Done
+                        </span>
+
+                        <button 
+                            @click="closeProgressModal" 
+                            :disabled="isProcessingSubmit" 
+                            class="px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg transform active:scale-95" 
+                            :class="isProcessingSubmit 
+                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50' 
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'"
+                        >
+                            {{ isProcessingSubmit ? 'Please Wait...' : 'Close Window' }}
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </Transition>

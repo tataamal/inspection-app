@@ -26,5 +26,7 @@ Route::middleware('auth_custom')->group(function () {
         return Inertia::render('InspectionOperation');
     })->name('inspection-operation');
 
+    Route::post('/inspection-operation/submit', [InspectionController::class, 'submitQm'])->name('inspection.submit_qm');
+
     Route::post('/inspection-operation/simulate', [InspectionController::class, 'simulate'])->name('inspection.simulate');
 });

@@ -515,8 +515,8 @@ const getStatusColor = (status) => {
                                 <i class="fa-solid fa-clipboard-check"></i>
                             </div>
                             <div class="flex flex-col text-left">
-                                <span class="text-xl font-extrabold text-white leading-none">Operation</span>
-                                <span class="text-xs font-bold uppercase tracking-wider text-sky-400 mt-1">Inspeksi</span>
+                                <span class="text-xl font-extrabold text-white leading-none">Inspeksi</span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-sky-400 mt-1">Operation</span>
                             </div>
                         </div>
                     </div>
