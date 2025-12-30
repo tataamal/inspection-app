@@ -628,6 +628,13 @@ class InspectionController extends Controller
 
         $username = $sapCreds['username'] ?? 'unknown';
         $password = $sapCreds['password'] ?? '';
+        $nik = $sapCreds['nik'] ?? null;
+        
+        $namaKaryawan = null;
+        if ($nik) {
+             $emp = DB::table('mapping_user_plant')->where('nik', $nik)->first();
+             $namaKaryawan = $emp ? $emp->nama_karyawan : null;
+        }
         
         $payload = [
             'items' => $request->input('items'),
@@ -635,7 +642,7 @@ class InspectionController extends Controller
             'password' => $password
         ];
 
-        return response()->stream(function () use ($payload, $username) {
+        return response()->stream(function () use ($payload, $username, $nik, $namaKaryawan) {
              $sapBaseUrl = config('services.sap.url'); 
              $url = "{$sapBaseUrl}/api/submit_qm_stream";
 
@@ -675,6 +682,8 @@ class InspectionController extends Controller
 
                                       HistorySubmitQm::create([
                                           'username' => $username,
+                                          'nik' => $nik,
+                                          'nama_karyawan' => $namaKaryawan,
                                           'process_date' => now(),
                                           'aufnr' => $sapItem['AUFNR'] ?? null,
                                           'maktx' => $sapItem['MAKTX'] ?? null,

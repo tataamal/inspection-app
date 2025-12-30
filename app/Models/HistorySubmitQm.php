@@ -13,6 +13,8 @@ class HistorySubmitQm extends Model
     
     protected $fillable = [
         'username',
+        'nik',
+        'nama_karyawan',
         'process_date',
         'aufnr',
         'maktx',
