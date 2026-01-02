@@ -39,10 +39,13 @@ const isAdmin = computed(() => {
     return props.authUser?.role === 'admin';
 });
 
-// CHECK DATE > 25
+// CHECK DATE > H-5 (End of Month) OR 1-5 (Start of Month)
 const isAfter25th = computed(() => {
     const d = new Date();
-    return d.getDate() > 25;
+    const currentDay = d.getDate();
+    // Menu muncul tanggal 1-5 awal bulan ATAU h-5 akhir bulan
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return currentDay <= 5 || currentDay > (lastDay - 5);
 });
 
 const goToInspectionOperation = () => {
@@ -99,7 +102,7 @@ const formatDateISO = (d) => {
 const setDateRange = (type) => {
     const today = new Date();
     let start = new Date();
-    let end = new Date();
+    const end = new Date();
 
     if (type === 'today') {
         // Start = End = Today
