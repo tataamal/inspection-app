@@ -39,13 +39,9 @@ const isAdmin = computed(() => {
     return props.authUser?.role === 'admin';
 });
 
-// CHECK DATE > H-5 (End of Month) OR 1-5 (Start of Month)
+// MODIFIKASI: Fitur inspect operation buka untuk semua tanggal
 const isAfter25th = computed(() => {
-    const d = new Date();
-    const currentDay = d.getDate();
-    // Menu muncul tanggal 1-5 awal bulan ATAU h-5 akhir bulan
-    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    return currentDay <= 5 || currentDay > (lastDay - 5);
+    return true;
 });
 
 const goToInspectionOperation = () => {
