@@ -445,17 +445,10 @@ class InspectionController extends Controller
                     }
                 }
             }
-
-            // 4. Hitung UD Code (Otomatis logic sederhana)
-            // Logic: Jika Reject > 0 maka 'R' (Reject), jika 0 maka 'A' (Accept)
-            // Sesuaikan dengan logic bisnis plant Anda (seperti di bulkPass)
             $udCode = ($validated['qty_reject'] > 0) ? 'R' : 'A';
             
-            // 5. Kirim ke SAP (Opsional: Menggunakan endpoint send_usage_decision seperti bulkPass)
             $sapBaseUrl = config('services.sap.url');
             
-            // NOTE: Sesuaikan logic Plant/UD Set seperti di function bulkPass Anda
-            // Contoh sederhana:
             $payloadSAP = [
                 'prueflos'        => $lotNumber, 
                 'username'        => $sapCreds['username'],
@@ -467,25 +460,13 @@ class InspectionController extends Controller
                 'ud_code_group'   => 'ZI',   // Sesuaikan
                 'stock_posting'   => 'X'
             ];
-
-            // Uncomment jika ingin langsung kirim ke SAP saat klik simpan
-            /*
-            $responseSAP = Http::timeout(60)->post("{$sapBaseUrl}/api/send_usage_decision", $payloadSAP);
-            if (!$responseSAP->successful()) {
-                throw new \Exception("Gagal kirim ke SAP: " . $responseSAP->body());
-            }
-            */
-
-            // 6. Simpan ke Database Lokal (HistoryQualityManagement atau tabel InspectionDetail)
-            // Disini saya contohkan simpan ke HistoryQualityManagement seperti bulkPass
             HistoryQualityManagement::create([
                 'prueflos'       => $lotNumber,
                 'inspector_nik'  => $validated['nik_qc'],
-                'quantity'       => $validated['qty_accepted'], // Total atau accepted?
-                'status'         => 'SUCCESS', // Atau 'PENDING'
+                'quantity'       => $validated['qty_accepted'],
+                'status'         => 'SUCCESS',
                 'sap_message'    => 'Manual Inspection Input',
                 'ud_code'        => $udCode,
-                // Simpan data detail inspection (Defect, Notes, Images) ke kolom JSON atau tabel terpisah
                 'full_lot_snapshot' => json_encode([
                     'defects'      => $validated['defects'],
                     'cause_effect' => $validated['cause_effect'],
@@ -500,8 +481,6 @@ class InspectionController extends Controller
             ]);
 
             DB::commit();
-
-            // 7. Redirect kembali
             return redirect()->back()->with('success', 'Data inspeksi berhasil disimpan!');
 
         } catch (\Exception $e) {
@@ -510,6 +489,7 @@ class InspectionController extends Controller
             return redirect()->back()->withErrors(['message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
         }
     }
+    
     public function simulate(Request $request)
     {
         $validated = $request->validate([
@@ -524,6 +504,12 @@ class InspectionController extends Controller
                 'string',
                 'required_without:pro'
             ],
+            'plant' => [
+                'nullable',
+                'string',
+                'max:4',
+                'required_with:mrp'
+            ]
         ], [
             'pro.regex' => 'Format PRO tidak valid. Hanya angka, spasi, dan titik koma (;) yang diperbolehkan.',
             'pro.required_without' => 'PRO wajib diisi jika MRP kosong.',
@@ -534,18 +520,17 @@ class InspectionController extends Controller
             return back()->withErrors(['message' => 'Hanya boleh mengisi salah satu (PRO atau MRP).']);
         }
 
-        // Parse Data & Construct Payload
         $payload = [
             'username' => env('SAP_API_USERNAME', 'auto_email'),
             'password' => env('SAP_API_PASSWORD', '11223344'), 
-            'values'   => []
+            'values'   => [],
+            'plant'    => $validated['plant'] ?? null
         ];
         $typeLabel = '';
 
         if (!empty($validated['pro'])) {
             $payload['type'] = 'PRO';
             $typeLabel = 'Production Order (PRO)';
-            // Replace spaces with semicolons, then split by semicolon
             $raw = str_replace(' ', ';', $validated['pro']);
             $items = explode(';', $raw);
             $payload['values'] = array_values(array_filter($items, fn($value) => !is_null($value) && trim($value) !== ''));
@@ -559,7 +544,7 @@ class InspectionController extends Controller
 
         try {
             $apiUrl = env('SAP_API_URL') . '/api/get_data_inspect_oper';
-            $response = Http::timeout(3600)->post($apiUrl, $payload); // Long timeout for MRP
+            $response = Http::timeout(3600)->post($apiUrl, $payload);
 
             if ($response->successful()) {
                 $json = $response->json();
@@ -573,7 +558,6 @@ class InspectionController extends Controller
                             'QTY'   => (float)($item['GMNGA'] ?? 0),
                             'UOM'   => ($item['GMEIN'] ?? '') === 'ST' ? 'PC' : ($item['GMEIN'] ?? ''),
                             'BUDAT' => isset($item['BUDAT']) ? date('d-m-Y', strtotime($item['BUDAT'])) : '-',
-                            // Hidden fields
                             'RUECK' => $item['RUECK'] ?? null,
                             'RMZHL' => $item['RMZHL'] ?? null
                         ];

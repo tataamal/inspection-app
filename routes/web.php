@@ -21,7 +21,6 @@ Route::middleware('auth_custom')->group(function () {
     Route::get('/inspection/{dispo}', [InspectionController::class, 'index'])->name('inspection.index');
     Route::post('/inspection/bulk-pass', [InspectionController::class, 'bulkPass'])->name('inspection.bulk_pass');
 
-    // New Route for Inspection Operation (Frontend only for now)
     Route::get('/inspection-operation', function () {
         return Inertia::render('InspectionOperation');
     })->name('inspection-operation');

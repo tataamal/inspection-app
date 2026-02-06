@@ -10,7 +10,8 @@ const props = defineProps({
 
 const form = reactive({
     pro: '',
-    mrp: ''
+    mrp: '',
+    plant: ''
 });
 
 const isLoading = ref(false);
@@ -307,6 +308,18 @@ const closeProgressModal = () => {
 
 const submit = async () => {
     if (!form.pro && !form.mrp) return;
+    
+    // Validation for MRP + Plant
+    if (form.mrp && !form.plant) {
+         Swal.fire({
+            icon: 'warning',
+            title: 'Plant Required',
+            text: 'Untuk pencarian berdasarkan MRP, Plant (IV_WERKS) wajib diisi.',
+            background: '#1e293b',
+            color: '#fff'
+        });
+        return;
+    }
 
     // Confirm for MRP (Potential Long Wait)
     if (form.mrp) {
@@ -579,6 +592,31 @@ const logout = () => {
                                 </p>
                             </div>
 
+                            <!-- PLANT Input Container (Dependent on MRP) -->
+                            <div class="w-full md:w-32 flex flex-col gap-2 transition-all duration-300" 
+                                :class="{ 'opacity-50 grayscale': !form.mrp || form.pro.length > 0 }">
+                                <label for="plant" class="text-xs uppercase font-bold text-emerald-400 tracking-wider">
+                                    PLANT
+                                </label>
+                                <div class="relative group/input flex-1">
+                                    <input 
+                                        id="plant"
+                                        type="text" 
+                                        v-model="form.plant"
+                                        :disabled="!form.mrp || form.pro.length > 0"
+                                        placeholder="Code" 
+                                        maxlength="4"
+                                        class="w-full h-full min-h-[56px] bg-black/40 rounded-xl border border-white/10 text-white text-lg py-3 pl-10 pr-4 focus:border-emerald-500/50 focus:bg-black/20 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 font-mono disabled:cursor-not-allowed disabled:bg-black/20 text-center uppercase"
+                                    >
+                                    <div class="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded flex items-center justify-center bg-white/5 text-slate-500 group-focus-within/input:text-emerald-400 transition-colors">
+                                        <i class="fa-solid fa-industry text-xs"></i>
+                                    </div>
+                                </div>
+                                <p class="text-[0.65rem] text-slate-500 pl-1">
+                                    *Optional (ex: 1000)
+                                </p>
+                            </div>
+
                         </div>
 
                         <!-- SUBMIT BUTTON -->
@@ -605,6 +643,9 @@ const logout = () => {
                             <div>
                                 <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
                                     {{ form.pro ? 'Production Order (PRO)' : 'MRP Controller' }}
+                                    <span v-if="form.plant && form.mrp" class="text-emerald-500 ml-1 opacity-75">
+                                        (Plant: {{ form.plant }})
+                                    </span>
                                 </h3>
                                 <p class="text-white font-mono font-medium text-lg truncate max-w-md">
                                     {{ form.pro || form.mrp }}

@@ -16,26 +16,18 @@ class DashboardController extends Controller
 
     private function determineSection($item)
     {
-        // Decode JSON snapshot jika ada
         $snapshot = isset($item->full_lot_snapshot) ? json_decode($item->full_lot_snapshot, true) : [];
         
-        // Ambil DISPO (MRP Controller) dari snapshot
         $dispo = $snapshot['DISPO'] ?? '';
         
-        // Ambil Deskripsi Material
         $maktx = $item->material_desc ?? ($snapshot['KTEXTMAT'] ?? ''); 
-
-        // Logika Packing berdasarkan DISPO
         if (in_array($dispo, ['D24', 'G32'])) {
             return 'Packing';
         }
 
-        // Logika Painting berdasarkan DISPO
         if (in_array($dispo, ['G31', 'D23', 'D28', 'MA4', 'MA7', 'MF4'])) {
             return 'Painting';
         }
-
-        // Logika Painting Khusus (DISPO D22 & ada 'UNF' di deskripsi)
         if ($dispo === 'D22' && stripos($maktx, 'UNF') !== false) {
             return 'Painting';
         }
@@ -43,12 +35,8 @@ class DashboardController extends Controller
         return 'Other';
     }
 
-    /**
-     * Helper untuk menerapkan filter query (Reusable & Konsisten)
-     */
     private function applyFilters($query, Request $request)
     {
-        // 1. Filter Tanggal (Handle startDate dari Vue DAN start_date legacy)
         if ($request->filled('startDate')) {
             $query->whereDate('created_at', '>=', $request->startDate);
         } elseif ($request->filled('start_date')) {
@@ -61,12 +49,10 @@ class DashboardController extends Controller
             $query->whereDate('created_at', '<=', $request->end_date);
         }
 
-        // 2. Filter Status
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // 3. Filter Bagian (Section) - UPDATED: Menggunakan DISPO dari JSON full_lot_snapshot
         if ($request->filled('section')) {
             $section = $request->section;
             if ($section === 'Packing') {
